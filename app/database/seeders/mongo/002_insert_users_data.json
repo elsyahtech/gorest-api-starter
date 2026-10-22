@@ -1,0 +1,115 @@
+{
+  "collection": "users",
+  "data": [
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e01",
+      "email": "admin1@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-01",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e02",
+      "email": "admin2@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-01",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e03",
+      "email": "admin3@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-02",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e04",
+      "email": "admin4@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-02",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e05",
+      "email": "admin5@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-03",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e06",
+      "email": "admin6@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-03",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e07",
+      "email": "admin7@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-04",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e08",
+      "email": "admin8@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-04",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e09",
+      "email": "admin9@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-05",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e10",
+      "email": "admin10@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-05",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    },
+    {
+      "id": "3746e32f-1bd6-4023-a608-f535696f5e11",
+      "email": "admin11@mail.com",
+      "password": "$2a$12$eXampleHashedPasswordStringForTestingOnly",
+      "department_id": "dept-05",
+      "is_active": true,
+      "created_at": "2026-09-21T00:00:00Z",
+      "updated_at": null,
+      "deleted_at": null
+    }
+  ]
+}

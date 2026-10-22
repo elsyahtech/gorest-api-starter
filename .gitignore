@@ -25,9 +25,41 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment files and local overrides. Keep the documented template trackable.
 .env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+*.local.*
+
+# Credentials, private keys, and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Local databases, backups, and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sql.gz
+*.dump
+*.bak
+
+# Generated application artifacts
+/bin/
+logs/
+*.log
+*.tmp
+*.swp
+*.swo
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+.DS_Store
