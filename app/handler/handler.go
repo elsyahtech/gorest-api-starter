@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/elsyahtech/gorest-api-starter/app/library"
 	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest-api-starter/app/library"
 	"github.com/elsyahtech/gorest/view"
 )
 

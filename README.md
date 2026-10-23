@@ -24,28 +24,26 @@ For vulnerability reporting and the project's security policy, see [SECURITY.md]
 
 All routes are registered under `/examples` and have no authentication or authorization. Do not expose them to untrusted clients. Before adapting this starter for a business application, add access controls, review every example operation, and follow the [deployment checklist](./docs/configuration.md).
 
-The checked-in configuration is for local examples: PostgreSQL is enabled, a sample database password is present in source, and migrations and seeders run at startup. Do not use these values or startup settings in production.
+The checked-in configuration is for local examples only: it uses GOREST's SQLite default and enables both migrations and sample seeders (`Migration=true`, `Seeder=true`). Do not deploy these startup settings to production. Production application instances must not run the sample seeders or apply migrations automatically; use a controlled deployment migration step. See the [database guide](./docs/database.md) before selecting another driver or adapting the configuration for deployment.
 
 ## Requirements
 
 - Go `1.26.5` or newer.
-- PostgreSQL for the default configuration.
+- SQLite for the default configuration; no external database service is required to start the examples.
 
 Migration and seeder examples are provided for PostgreSQL, MySQL, Oracle, SQL Server, SQLite, MongoDB, and ScyllaDB. Their schema, query syntax, and transaction capabilities are not identical. See the [database guide](./docs/database.md) before switching drivers.
 
 ## Quick start
 
-1. Create a local PostgreSQL database and user.
-2. Update the local connection settings in `app/config/database.go`. The checked-in credentials are examples.
-3. Review the local server and CORS settings in `app/config/server.go`.
-4. From the repository root, run:
+1. Review the local server and CORS settings in `app/config/server.go`.
+2. From the repository root, run:
 
    ```sh
    go run .
    ```
 
-   Or run `make run`. The server listens at `http://127.0.0.1:3000`. Database migrations and seeders are enabled by default and run during application startup.
-5. Try a read-only example:
+   Or run `make run`. The server listens at `http://127.0.0.1:3000`. Database migrations and seeders run at startup; the SQLite file is created at `app/database/gorest.db`.
+3. Try a read-only example:
 
    ```sh
    curl http://127.0.0.1:3000/examples/orm-queries/users
@@ -63,11 +61,12 @@ make build     # build bin/gorest-api-starter
 make test-e2e  # run E2E tests; external database tests are skipped unless enabled
 make test-mongo   # run opt-in MongoDB tests (requires a local service)
 make test-scylla  # run opt-in ScyllaDB tests (requires a local service)
+make test-drivers # run disposable database integration checks across drivers
 make coverage     # generate SQLite E2E coverage.out and coverage.html
 make coverage-e2e # include opt-in MongoDB and ScyllaDB tests
 make push          # interactively sanitize, stage, commit, and optionally push
 ```
 
-See the [testing and E2E guide](./docs/testing.md) for service setup, environment variables, coverage details, and test limitations. The default suite includes SQLite-backed HTTP E2E tests; MongoDB and ScyllaDB tests are opt-in and require separately provisioned services. A passing test or build does not establish that every example works with every supported database driver.
+See the [testing and E2E guide](./docs/testing.md) for service setup, environment variables, coverage details, and test limitations. The default suite includes SQLite-backed HTTP E2E tests; MongoDB and ScyllaDB HTTP tests are opt-in. A passing test or build does not establish that every example works with every supported database driver.
 
 `make push` asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming; this helper only sanitizes the listed field names in `app/config/*.go` and is not a general secret scanner.

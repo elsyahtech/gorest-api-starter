@@ -11,12 +11,13 @@ This documentation is the application-specific guide for developers evaluating o
 5. [Configuration, security, and deployment](./configuration.md) — server, database, logging, Redis, and deployment checklist.
 6. [Adding features](./extending.md) — a consistent workflow for extending the application.
 7. [Testing and E2E coverage](./testing.md) — local test commands, coverage, optional database services, and suite limitations.
+8. [Release checks](./release-checks.md) — pinned tool versions, CI release gate, and evidence retention.
 
 ## Scope
 
 - These guides describe the configuration and examples in this repository. For framework APIs, ORM behavior, middleware, and helpers, use the GOREST documentation.
 - Routes under `/examples` are demonstrations, not a production API contract. They have no authentication or authorization.
-- The checked-in configuration is for local development and includes a sample database password, enabled migrations, and enabled seeders. Replace these settings before deployment.
+- The checked-in database configuration uses SQLite and enables this starter's migrations and seeders, so the examples can run locally without a database server or credentials. See the [database guide](./database.md) before switching drivers; review startup and secret handling before deployment.
 - Database examples are driver-specific. A migration or query example for one database is not a guarantee of equivalent behavior on another driver.
 - Keep this documentation in sync when changing routes, request/response DTOs, configuration, migrations, seeders, or application behavior.
 - For private vulnerability reporting and the project's security policy, see [`SECURITY.md`](../SECURITY.md).

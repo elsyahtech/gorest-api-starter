@@ -31,8 +31,8 @@ Maintainers will acknowledge and investigate reports on a best-effort basis. The
 This repository is a learning and implementation starter, not a production-secured service. In particular:
 
 - The `/examples` routes do not implement authentication or authorization. Do not expose them to untrusted clients without adding appropriate access controls.
-- Database configuration is defined in Go source, not loaded from a secret manager or environment variables by default. The checked-in database credential is an example value; replace it for local use and never deploy it as a real credential. If a real secret has ever been used in a deployment, rotate it.
-- Migrations and seeders are enabled in the default application configuration. Review and change startup behavior before deployment.
+- The checked-in starter configuration uses SQLite and contains no database credentials. Runtime connection settings are read from `GOREST_DB_*` and optional Redis settings from `GOREST_REDIS_*`; the application does not load `.env` files. Inject production secrets through a protected environment or secret manager. If a real secret has ever been committed or used in a deployment, rotate it.
+- `Migration=true` / `Seeder=true` are local-example defaults only. With `APP_ENV=production`, both default to false and startup rejects either being enabled. Apply schema changes through a controlled deployment step; do not run sample seeders against production data.
 - CORS, security headers, request limits, and the in-memory rate limiter are not substitutes for authentication, authorization, TLS, or deployment-level controls. The in-memory limiter applies per process.
 - Native SQL examples are driver-specific; ORM and transaction behavior differs between database drivers. Passing the test suite does not establish that every driver or production topology is secure.
 

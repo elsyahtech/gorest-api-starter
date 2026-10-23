@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest-api-starter/app/entity"
 )
 
 // DeleteOrder removes the order with the given ID in a transaction.

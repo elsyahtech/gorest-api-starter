@@ -1,6 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elsyahtech/gorest/server"
@@ -18,6 +22,46 @@ import (
 // implement authentication, authorization, and any required CSRF protections.
 // Configure TLS at a trusted ingress/reverse proxy or in the server deployment.
 func Server() server.Config {
+	cfg, err := LoadServer()
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+// LoadServer applies deployment-specific bind and CORS settings. In production,
+// bind settings must be explicit so the local loopback example is not reused.
+func LoadServer() (server.Config, error) {
+	if err := validateEnvironment(); err != nil {
+		return server.Config{}, err
+	}
+	port := 3000
+	if value, ok := os.LookupEnv("GOREST_SERVER_PORT"); ok {
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || parsed < 1 || parsed > 65535 {
+			return server.Config{}, fmt.Errorf("GOREST_SERVER_PORT must be an integer between 1 and 65535")
+		}
+		port = parsed
+	}
+	host := envString("GOREST_SERVER_HOST", "127.0.0.1")
+	origins := csvEnv("GOREST_CORS_ORIGINS")
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+	if Environment() == "production" {
+		if err := requireProductionEnv("GOREST_SERVER_HOST"); err != nil {
+			return server.Config{}, err
+		}
+		if err := requireProductionEnv("GOREST_SERVER_PORT"); err != nil {
+			return server.Config{}, err
+		}
+		if err := requireProductionEnv("GOREST_CORS_ORIGINS"); err != nil {
+			return server.Config{}, err
+		}
+		if len(csvEnv("GOREST_CORS_ORIGINS")) == 0 {
+			return server.Config{}, fmt.Errorf("GOREST_CORS_ORIGINS must contain at least one origin when APP_ENV=production")
+		}
+	}
 	return server.Config{
 		// Keep request timeouts finite and cap the body size. These timeout values
 		// match GOREST defaults; adjust them for the application's workload.
@@ -28,10 +72,8 @@ func Server() server.Config {
 			IdleTimeout:  120 * time.Second,
 		},
 
-		// Replace this example with the exact browser origins allowed to call the API.
-		// CORS is enforced by browsers; it does not authenticate or authorize requests.
 		Cors: &cors.Config{
-			AllowOrigins: []string{"https://app.example.com"},
+			AllowOrigins: origins,
 			AllowMethods: []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 			AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
 			MaxAge:       300,
@@ -61,7 +103,22 @@ func Server() server.Config {
 
 		// Local-only by default. In a container, bind to 0.0.0.0 only when the
 		// deployment network/firewall controls which clients can reach the service.
-		Host: "127.0.0.1",
-		Port: 3000,
+		Host: host,
+		Port: port,
+	}, nil
+}
+
+func csvEnv(key string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return []string{}
 	}
+	items := strings.Split(value, ",")
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
