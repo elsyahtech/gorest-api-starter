@@ -101,6 +101,14 @@ if ! command -v perl >/dev/null 2>&1; then
 	exit 1
 fi
 
+if ! command -v gitleaks >/dev/null 2>&1; then
+	printf 'ERROR: Gitleaks is required. Install the pinned version documented in docs/release-checks.md.\n' >&2
+	exit 1
+fi
+
+printf 'Scanning the working tree and Git history for secrets before configuration sanitization...\n'
+make secret-scan
+
 if ! confirm 'This will temporarily blank non-empty credential fields in app/config/*.go before staging. Continue?'; then
 	printf 'Cancelled. No files were changed or staged.\n'
 	exit 0

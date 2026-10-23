@@ -24,6 +24,7 @@ test-driver-sqlite:
 	GOREST_DRIVER_INTEGRATION=sqlite go test ./test/drivers -run '^TestDatabaseDriverIntegration$$' -count=1 -v
 
 secret-scan:
+	gitleaks dir . --redact --exit-code 1
 	gitleaks git . --redact --exit-code 1
 
 tool-versions:

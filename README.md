@@ -56,7 +56,8 @@ For complete setup steps, payload examples, and endpoint behavior, use [Getting 
 ```sh
 make test      # go test ./...
 make check     # go vet ./... and go test ./...
-make lint      # golangci-lint run ./... (install separately)
+make lint      # pinned baseline golangci-lint checks (install separately)
+make lint-full # all configured linters, including the quality backlog
 make build     # build bin/gorest-api-starter
 make test-e2e  # run E2E tests; external database tests are skipped unless enabled
 make test-mongo   # run opt-in MongoDB tests (requires a local service)
@@ -64,9 +65,9 @@ make test-scylla  # run opt-in ScyllaDB tests (requires a local service)
 make test-drivers # run disposable database integration checks across drivers
 make coverage     # generate SQLite E2E coverage.out and coverage.html
 make coverage-e2e # include opt-in MongoDB and ScyllaDB tests
-make push          # interactively sanitize, stage, commit, and optionally push
+make push          # secret-scan, then interactively sanitize, stage, commit, and optionally push
 ```
 
 See the [testing and E2E guide](./docs/testing.md) for service setup, environment variables, coverage details, and test limitations. The default suite includes SQLite-backed HTTP E2E tests; MongoDB and ScyllaDB HTTP tests are opt-in. A passing test or build does not establish that every example works with every supported database driver.
 
-`make push` asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming; this helper only sanitizes the listed field names in `app/config/*.go` and is not a general secret scanner.
+`make push` runs Gitleaks against the current working tree and Git history before sanitizing or staging. It then asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming. The sanitizer is a narrow helper; Gitleaks is the repository and history scanner.

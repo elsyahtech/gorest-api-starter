@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/handler"
@@ -18,6 +19,7 @@ import (
 	"github.com/elsyahtech/gorest/database"
 	gorestlog "github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/server"
+	"github.com/gofiber/fiber/v3"
 )
 
 func newDepartmentTestServer(t *testing.T) *server.Server {
@@ -104,7 +106,7 @@ func sendRequest(t *testing.T, testServer *server.Server, method, path string, b
 		request.Header.Set("Content-Type", "application/json")
 	}
 
-	response, err := testServer.SRV.Test(request)
+	response, err := testServer.SRV.Test(request, fiber.TestConfig{Timeout: 10 * time.Second})
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
 	}

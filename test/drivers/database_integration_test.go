@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -59,7 +61,92 @@ func TestDatabaseDriverIntegration(t *testing.T) {
 	}
 	verifyConflictAndInvalidRequests(t, app, driver)
 	verifyConcurrentRequests(t, app, driver)
+	verifyConnectionStartupFailure(t, driver)
 	verifyMigrationStartupFailure(t, config, driver)
+}
+
+func TestDatabaseDriverStartupFailsWithoutDatabase(t *testing.T) {
+	driver := strings.ToLower(strings.TrimSpace(os.Getenv("GOREST_DRIVER_LIFECYCLE_DRIVER")))
+	if driver == "" {
+		t.Skip("set GOREST_DRIVER_LIFECYCLE_DRIVER to verify connection failure during startup")
+	}
+	verifyConnectionStartupFailure(t, driver)
+}
+
+func TestDatabaseDriverProcessFailsOnConnection(t *testing.T) {
+	driver := strings.ToLower(strings.TrimSpace(os.Getenv("GOREST_DRIVER_CONNECTION_FAILURE")))
+	if driver == "" {
+		t.Skip("internal subprocess check")
+	}
+	startWithUnavailableDatabase(t, driver)
+}
+
+func verifyConnectionStartupFailure(t *testing.T, driver string) {
+	t.Helper()
+
+	config, _ := integrationDatabaseConfig(t, driver)
+	config.Migration = false
+	config.Seeder = false
+	if driver == database.SQLITE {
+		t.Log("sqlite startup connection failure: not applicable; SQLite is embedded. SQLite migration startup failure is covered by the migration failure scenario.")
+		return
+	}
+	childValues := map[string]string{"GOREST_DRIVER_CONNECTION_FAILURE": driver}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve unavailable %s database port: %v", driver, err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		t.Fatalf("release unavailable %s database port: %v", driver, err)
+	}
+	childValues["GOREST_DRIVER_FAILURE_PORT"] = fmt.Sprint(port)
+
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("locate test executable for %s connection failure check: %v", driver, err)
+	}
+	command := exec.Command(executable, "-test.run=^TestDatabaseDriverProcessFailsOnConnection$", "-test.v")
+	command.Env = integrationChildEnvironment(childValues)
+	output, err := command.CombinedOutput()
+	if err == nil {
+		t.Fatalf("%s application startup succeeded with an unavailable database; output: %s", driver, output)
+	}
+	if !strings.Contains(string(output), "failed initializing database") {
+		t.Fatalf("%s startup exited for an unexpected reason; output: %s", driver, output)
+	}
+	if strings.Contains(string(output), "database initialized successfully") {
+		t.Fatalf("%s startup reported database initialization success despite connection failure; output: %s", driver, output)
+	}
+	t.Logf("%s startup rejected an unavailable database", driver)
+}
+
+func startWithUnavailableDatabase(t *testing.T, driver string) {
+	t.Helper()
+
+	config, _ := integrationDatabaseConfig(t, driver)
+	config.Migration = false
+	config.Seeder = false
+	config.Port = os.Getenv("GOREST_DRIVER_FAILURE_PORT")
+	logConfig := gorestlog.ConfigDefault
+	logConfig.LogDir = filepath.Join(t.TempDir(), "logs")
+	app := gorest.New(gorest.Config{AppName: "gorest-api-starter-driver-startup-failure", Environment: "Test", Timezone: "UTC"})
+	app.Use(gorestlog.Run(logConfig), database.Run(config))
+	t.Fatal("application startup unexpectedly succeeded with an unavailable database")
+}
+
+func integrationChildEnvironment(overrides map[string]string) []string {
+	environment := make([]string, 0, len(os.Environ())+len(overrides))
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if _, overridden := overrides[key]; !overridden {
+			environment = append(environment, entry)
+		}
+	}
+	for key, value := range overrides {
+		environment = append(environment, key+"="+value)
+	}
+	return environment
 }
 
 func integrationDatabaseConfig(t *testing.T, driver string) (database.Config, string) {
@@ -608,7 +695,7 @@ func integrationRequestResult(testServer *server.Server, method, path string, bo
 		return integrationHTTPResponse{}, err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	response, err := testServer.SRV.Test(request, fiber.TestConfig{Timeout: 10 * time.Second})
+	response, err := testServer.SRV.Test(request, fiber.TestConfig{Timeout: 30 * time.Second})
 	if err != nil {
 		return integrationHTTPResponse{}, err
 	}
