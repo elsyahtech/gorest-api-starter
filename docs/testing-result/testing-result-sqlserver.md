@@ -5,7 +5,7 @@
 **Target:** local container, `127.0.0.1:1433`, disposable test database; isolated disposable target cleaned up after the run  
 **Server:** SQL Server 2022 (RTM-CU26), 16.0.4265.3 (X64)  
 **Go / driver:** `go1.26.5 darwin/amd64`; `github.com/microsoft/go-mssqldb v1.11.2`  
-**Source:** `1d86605f56cff6c5df751aabdb93bddc995b4870`; working tree contained uncommitted changes  
+**Source commit:** `21e0662bc6d4eb24ffdaf68d9ef57e158ade8523` (tests rerun from a clean archive of this commit)
 **Command:** `GOREST_DRIVER_INTEGRATION=sqlserver go test -v -count=1 -timeout=20m ./test/drivers -run '^TestDatabaseDriverIntegration$'`
 
 Credentials are supplied through environment variables and are not recorded here. The disposable test target was cleaned up after this run.
@@ -18,8 +18,8 @@ Credentials are supplied through environment variables and are not recorded here
 | Mid-step rollback | `passed` — a constraint failure on the second transaction write rolled back the earlier write. |
 | Conflicts and invalid operations | `passed` — duplicate request key, malformed JSON, and update of a missing user were rejected without creating rows. |
 | Concurrent requests | `passed` — all eight simultaneous creates returned HTTP `200`, `success=true`, and matching persisted rows. |
-| Startup failure | `partial` — startup rejected an invalid migration after connecting. Initial connection failure was not exercised for this driver. |
-| Shutdown | `partial` — normal app shutdown passed; interrupted requests and shutdown timeout were not exercised by this driver test. |
+| Startup failure | `passed` — the driver integration run rejected an invalid migration; a subprocess run against a reserved then released local port exited with `failed initializing database`. |
+| Shutdown | `passed` — per-driver `app.Close()` closed the database and logger; the app-level E2E shutdown test waited for an in-flight request to complete before exit. |
 
 Recorded output:
 
@@ -34,5 +34,7 @@ sql server startup rejected an invalid migration
 sql server application shutdown passed
 PASS
 ```
+
+Supplemental lifecycle evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=sqlserver go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
 This evidence applies to the listed server version, driver, source revision, and test configuration only.

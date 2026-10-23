@@ -12,7 +12,7 @@ go install github.com/zricethezav/gitleaks/v8@v8.30.1
 GOTOOLCHAIN=local make release-check
 ```
 
-The gate first checks the exact Go, golangci-lint, and Gitleaks versions, then runs Go formatting checks, `go vet`, uncached package tests, the pinned baseline linters (`errcheck`, `govet`, `staticcheck`, `ineffassign`, and `unused`), the SQLite driver integration test, Gitleaks against Git history, and a build. It stops with a non-zero status if a check fails. The Make targets are also available individually (`tool-versions`, `format-check`, `vet`, `test`, `lint`, `test-driver-sqlite`, `secret-scan`, and `build`). The broader configured `make lint-full` remains available as a quality backlog check; it currently reports pre-existing findings in the starter's handlers, models, and formatting conventions.
+The gate first checks the exact Go, golangci-lint, and Gitleaks versions, then runs Go formatting checks, `go vet`, uncached package tests, the pinned baseline linters (`errcheck`, `govet`, `staticcheck`, `ineffassign`, and `unused`), the SQLite driver integration test, Gitleaks against the working tree and full Git history, and a build. It stops with a non-zero status if a check fails. The Make targets are also available individually (`tool-versions`, `format-check`, `vet`, `test`, `lint`, `test-driver-sqlite`, `secret-scan`, and `build`). The broader configured `make lint-full` remains available as a quality backlog check; it currently reports pre-existing findings in the starter's handlers, models, and formatting conventions.
 
 ## CI evidence
 
