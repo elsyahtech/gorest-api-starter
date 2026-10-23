@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest-api-starter/app/entity"
 )
 
 // CreateDepartment stores a department in a transaction.

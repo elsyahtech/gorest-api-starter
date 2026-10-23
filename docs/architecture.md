@@ -2,6 +2,18 @@
 
 This guide explains how a request moves through the starter, what each package owns, and the conventions used when adding application code. The implementation follows a layered flow so HTTP concerns, business rules, and database access have clear boundaries.
 
+## Purpose of this starter
+
+GOREST's framework documentation covers the framework APIs. This starter complements it with a complete application example that clients can study and adapt. It demonstrates:
+
+- Resource CRUD organized across router, handler, library, model, entity, and view packages.
+- ORM and selected native database query patterns.
+- Transactions where the configured database driver supports atomic transactions.
+- Database migrations, seeders, request/response DTOs, and application startup.
+- Tests and documentation that describe the examples' behavior and driver-specific limits.
+
+Treat the structure and naming conventions in this guide as a recommended starting standard for applications built with GOREST. They are conventions demonstrated by this starter, not requirements imposed by the framework. Use the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) for framework APIs and guarantees; use this repository's guides for the behavior implemented by this application. The `/examples` routes are learning examples and do not provide authentication or authorization.
+
 ## End-to-end lifecycle
 
 The lifecycle has two stages: application startup, followed by request processing. The diagram describes this repository's wiring; details such as middleware behavior and database APIs are defined by GOREST and its dependencies.
@@ -14,7 +26,7 @@ For a successful `POST /examples/departments`, the request path is:
 2. The handler in `app/handler/` decodes the JSON body into `entity.Department`.
 3. `DepartmentLibrary` in `app/library/` coordinates the operation and applies application-level checks.
 4. `DepartmentModel` in `app/model/` uses GOREST's database API to persist the record.
-5. The handler builds the response with the GOREST JSON response helper. If the operation fails, the handler logs the error and returns an error response instead.
+5. The handler builds the response with the GOREST JSON response wrapper. If the operation fails, the handler logs the error and returns an error response instead.
 
 User and order endpoints follow the same layer boundaries. User examples also demonstrate password processing, bulk and upsert writes, ORM queries, and native database access.
 
@@ -22,10 +34,11 @@ User and order endpoints follow the same layer boundaries. User examples also de
 
 `main.go` creates an application named `gorest-api-starter` and registers the logger, Redis, database, and HTTP server using configuration from `app/config`. It then registers `UserRouter`, `DepartmentRouter`, and `OrderRouter`.
 
-- PostgreSQL database integration and the HTTP server are enabled in the checked-in configuration.
+- SQLite database integration and the HTTP server are enabled using the values in `app/config`.
+- The database setup starts from GOREST's `database.ConfigDefault`; the starter points migration/seeder discovery at `app/database` and enables both for local examples. These `Migration=true` / `Seeder=true` settings are not for production; use a controlled migration step and keep sample seeders disabled there.
 - Redis is registered as an optional service but disabled.
 - Database migrations and seeders are enabled. They run as part of database startup before the application serves requests; a startup failure must be investigated rather than treated as a successful launch.
-- Configuration is defined in Go source. The application does not load settings from `.env` or environment variables automatically.
+- Configuration defaults and environment loading live under `app/config/`. The starter reads supported settings from process environment variables and does not load `.env` files automatically. Local startup defaults to SQLite; production requires explicit database and HTTP bind settings, and keeps automatic migrations and sample seeders disabled.
 - The routes are grouped below `/examples`.
 
 See [Getting started](./getting-started.md) for local setup and [Configuration](./configuration.md) before using a different environment.
@@ -34,7 +47,7 @@ See [Getting started](./getting-started.md) for local setup and [Configuration](
 
 This starter is more than a CRUD application that happens to run: it is a practical map for organizing an application as it grows. A small CRUD example could be written entirely in `main.go`, but that structure becomes difficult to navigate and maintain when more resources, validation, business rules, integrations, and database operations are added. When all of those concerns accumulate together, even a working application can become hard to change safely.
 
-The layers below give each kind of work a clear home. This is an intentional starting standard for client applications—not structure for structure's sake, and not a claim that every small feature needs every layer. Follow the boundaries as the application grows so new behavior has a predictable place and the codebase remains understandable, testable, and maintainable over the long term.
+The layers below give each kind of work a clear home. This is the starter's recommended structure for client applications, not structure for structure's sake or a claim that every small feature needs every layer. Follow the boundaries as the application grows so new behavior has a predictable place and the codebase remains understandable, testable, and maintainable over the long term.
 
 | Directory | Responsibility |
 |---|---|
