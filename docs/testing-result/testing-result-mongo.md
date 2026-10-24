@@ -36,4 +36,8 @@ PASS
 
 Supplemental lifecycle evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=mongo go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
+Supplemental E2E evidence ran October 24, 2026 with `make test-e2e-mongo`. The disposable MongoDB 8.2.12 container passed migration/seeder, ORM CRUD, conflicts, concurrency, startup failure, and shutdown checks. The shared ORM route/lifecycle suite passed for applicable scenarios, including user, department, and order routes; transaction-atomicity cases were omitted because the exercised GOREST ORM API does not provide that behavior. All four native MongoDB route scenarios (create, read, update, delete) passed in their separate stage. The target removed its container and network after completion.
+
+MongoDB's suite uses MongoDB-specific fixtures and collection cleanup. Its shared ORM route coverage is distinct from the four native MongoDB query routes, and both stages ran successfully in the recorded target.
+
 This evidence applies to the listed server version, driver, source revision, and test configuration only.

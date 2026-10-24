@@ -91,13 +91,14 @@ For all routes, request body fields, query examples, and driver limitations, see
 ## Development commands
 
 ```sh
-make test      # Run go test ./...
-make check     # Run go vet ./... and then go test ./...
-make lint      # Run golangci-lint run ./...
-make build     # Build bin/gorest-api-starter
-make coverage  # Create coverage.out
-make clean     # Remove the binary and coverage.out
+make test       # Run all Go tests with per-test progress (go test -v ./... -count=1)
+make check      # Run go vet and all Go tests with progress and summaries
+make lint       # Run the five pinned baseline linters
+make lint-full  # Run all configured golangci-lint checks
+make test-e2e   # Run the isolated seven-driver E2E matrix (requires Docker)
+make build      # Build bin/gorest-api-starter
+make coverage   # Create coverage.out and coverage.html for E2E-named tests
+make clean      # Remove the binary and coverage files
 ```
 
-The `lint` target requires `golangci-lint` to be installed. For more development guidance, see [Adding features](./extending.md).
-For default E2E tests, optional MongoDB/ScyllaDB tests, and coverage generation, see [Testing and E2E coverage](./testing.md).
+The lint targets require `golangci-lint` to be installed. `make lint` is the repository's five-linter baseline; `make lint-full` runs every configured linter and may report existing backlog findings. `make test` runs all Go packages without starting database containers. `make test-e2e` provisions disposable containers and runs the database verification matrix for all seven drivers; driver-specific targets are available for faster focused runs. For the exact test scope, see [Testing and E2E coverage](./testing.md). For more development guidance, see [Adding features](./extending.md).

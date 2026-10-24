@@ -172,6 +172,18 @@ The ORM delete routes call GOREST's `Delete` operation, while the native routes 
 | `GET`, `POST` | `/examples/native-queries/users/scylla` | Native ScyllaDB/CQL |
 | `PUT`, `DELETE` | `/examples/native-queries/users/scylla/:id` | Native ScyllaDB/CQL |
 
-Use the native routes that match your active database driver. The native SQL update changes email, password, department, and `updatedAt` only when the stored user is active; it does not change `isActive`. The native MongoDB update changes email, password, department, and `updatedAt`; it also leaves `isActive` unchanged. The native ScyllaDB update changes email, password, department, and `isActive`. The SQL examples use PostgreSQL syntax and `$1` placeholders, so they are not automatically portable to other SQL drivers. The MongoDB and ScyllaDB operations use those drivers' native APIs. GOREST transaction calls in the MongoDB and ScyllaDB ORM examples do not provide SQL-style transaction atomicity. See the [database guide](./database.md).
+Use the native routes that match your active database driver. The native SQL update changes email, password, department, and `updatedAt` only when the stored user is active; it does not change `isActive`. The native MongoDB update changes email, password, department, and `updatedAt`; it also leaves `isActive` unchanged. The native ScyllaDB update changes email, password, department, and `isActive`. The native SQL examples choose parameter markers for the configured SQL driver and are tested on SQLite, PostgreSQL, MySQL, Oracle, and SQL Server. Other SQL syntax and behavior may still vary by driver. The MongoDB and ScyllaDB operations use those drivers' native APIs. GOREST transaction calls in the MongoDB and ScyllaDB ORM examples do not provide SQL-style transaction atomicity. See the [database guide](./database.md).
+
+## Users in Redis
+
+| Method | Path | Behavior |
+|---|---|---|
+| `GET` | `/examples/redis-queries/users` | List users stored in Redis |
+| `GET` | `/examples/redis-queries/users/:id` | Get one user by ID |
+| `POST` | `/examples/redis-queries/users` | Create a user; returns `409` if the ID already exists |
+| `PUT` | `/examples/redis-queries/users/:id` | Update an existing user; returns `404` if missing and `400` if the body ID conflicts with the URL ID |
+| `DELETE` | `/examples/redis-queries/users/:id` | Delete a user; returns `404` if missing |
+
+Redis records use keys in the `user:<id>` namespace. Create does not overwrite an existing key; update preserves the original `createdAt` and writes `updatedAt`. Redis must be enabled and reachable for these routes.
 
 For the E2E coverage by route, local test commands, and opt-in database requirements, see [Testing and E2E coverage](./testing.md).

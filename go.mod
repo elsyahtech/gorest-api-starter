@@ -3,7 +3,7 @@ module github.com/elsyahtech/gorest-api-starter
 go 1.26.5
 
 require (
-	github.com/elsyahtech/gorest v1.0.2
+	github.com/elsyahtech/gorest v1.0.6
 	github.com/gofiber/fiber/v3 v3.6.1
 	go.mongodb.org/mongo-driver/v2 v2.9.2
 )

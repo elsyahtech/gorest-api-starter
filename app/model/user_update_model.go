@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
+	goredis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -23,7 +25,6 @@ func (model *UserModel) UpdateUserWithTransaction(userID string, req *entity.Use
 		return "User payload must not be empty", http.StatusBadRequest,
 			errors.New("update user: payload is empty")
 	}
-
 	database := model.App.Database()
 
 	transaction, message, httpCode, err := database.BeginTx()
@@ -200,31 +201,20 @@ func (model *UserModel) UpdateUserWithNativeSQL(userID string, req *entity.User)
 
 	req.UpdatedAt = &timeNow
 
-	// Oracle.
-	// query := `
-	// 	UPDATE users
-	// 	SET email = :1, password = :2, department_id = :3, updated_at = :4
-	// 	WHERE id = :5 AND is_active = 1
-	// `
+	driver := model.App.GetDBConfig().Driver
+	activeValue := "true"
 
-	// SQL Server.
-	// query := `
-	// 	UPDATE users
-	// 	SET email = @p1, password = @p2, department_id = @p3, updated_at = @p4
-	// 	WHERE id = @p5 AND is_active = 1
-	// `
+	if driver == "oracle" || driver == "sqlserver" {
+		activeValue = "1"
+	}
 
-	// MySQL and SQLite.
-	// query := `
-	//         UPDATE users
-	//         SET email = ?, password = ?, department_id = ?, updated_at = ? WHERE id = ? AND is_active = true
-	// `
-
-	// PostgreSQL.
 	query := `
 		UPDATE users
-		SET email = $1, password = $2, department_id = $3, updated_at = $4
-		WHERE id = $5 AND is_active = true
+		SET email = ` + convertPH(driver, 1) + `,
+		password = ` + convertPH(driver, 2) + `,
+		department_id = ` + convertPH(driver, 3) + `,
+		updated_at = ` + convertPH(driver, 4) + `
+		WHERE id = ` + convertPH(driver, 5) + ` AND is_active = ` + activeValue + `
 	`
 
 	ctx, cancel := model.App.NewContext(5 * time.Second)
@@ -237,6 +227,7 @@ func (model *UserModel) UpdateUserWithNativeSQL(userID string, req *entity.User)
 		req.UpdatedAt,
 		userID,
 	)
+
 	if err != nil {
 		return message, httpCode, fmt.Errorf("%w", err)
 	}
@@ -387,4 +378,82 @@ func (model *UserModel) PatchUserActiveStatus(userID string, req *entity.UserAct
 	}
 
 	return "User status updated successfully", query.HTTPCode, nil
+}
+
+// UpdateUserInRedis updates a user's data in Redis.
+func (model *UserModel) UpdateUserInRedis(userID string, req *entity.User) (string, int, error) {
+	if userID == "" {
+		return "User ID param must not be empty", http.StatusBadRequest,
+			errors.New("update user: user ID is empty")
+	}
+
+	if req == nil {
+		return "User payload must not be empty", http.StatusBadRequest,
+			errors.New("update user: payload is empty")
+	}
+	if req.ID != "" && req.ID != userID {
+		return "User ID in the request must match the URL ID", http.StatusBadRequest,
+			errors.New("update user in Redis: request ID does not match URL ID")
+	}
+
+	redis := model.App.Redis()
+	ctx, cancel := model.App.NewContext(5 * time.Second)
+	defer cancel()
+
+	redisClient, message, httpCode, err := redis.QueryRedis()
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	redisKey := fmt.Sprintf("user:%s", userID)
+	var updateErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		updateErr = redisClient.Watch(ctx, func(tx *goredis.Tx) error {
+			jsonBytes, err := tx.Get(ctx, redisKey).Bytes()
+			if err != nil {
+				return err
+			}
+
+			var existing entity.User
+			if err := json.Unmarshal(jsonBytes, &existing); err != nil {
+				return fmt.Errorf("decode existing Redis user: %w", err)
+			}
+
+			updated := *req
+			updated.ID = userID
+			updated.CreatedAt = existing.CreatedAt
+			updatedAt := time.Now()
+			updated.UpdatedAt = &updatedAt
+
+			updatedJSON, err := json.Marshal(updated)
+			if err != nil {
+				return fmt.Errorf("marshal updated Redis user: %w", err)
+			}
+
+			_, err = tx.TxPipelined(ctx, func(pipe goredis.Pipeliner) error {
+				pipe.Set(ctx, redisKey, updatedJSON, 0)
+				return nil
+			})
+			return err
+		}, redisKey)
+
+		if !errors.Is(updateErr, goredis.TxFailedErr) {
+			break
+		}
+	}
+
+	if errors.Is(updateErr, goredis.Nil) {
+		return "User not found in Redis", http.StatusNotFound,
+			fmt.Errorf("update user in Redis: key does not exist: %w", goredis.Nil)
+	}
+	if errors.Is(updateErr, goredis.TxFailedErr) {
+		return "User changed during update; please retry", http.StatusConflict,
+			fmt.Errorf("update user in Redis: transaction retry limit reached: %w", updateErr)
+	}
+	if updateErr != nil {
+		return "Failed to update user in Redis", http.StatusInternalServerError,
+			fmt.Errorf("update user in Redis: %w", updateErr)
+	}
+
+	return "User updated successfully in Redis", httpCode, nil
 }

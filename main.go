@@ -19,15 +19,18 @@ func main() {
 	if err != nil {
 		failConfiguration(err)
 	}
+
 	serverConfig, err := config.LoadServer()
 	if err != nil {
 		failConfiguration(err)
 	}
+
 	redisConfig, err := config.LoadRedis()
 	if err != nil {
 		failConfiguration(err)
 	}
-	if config.Environment() == "production" {
+
+	if config.Environment() == gorest.Production {
 		if err := requireProductionRedis(redisConfig); err != nil {
 			failConfiguration(err)
 		}
@@ -62,21 +65,25 @@ func main() {
 }
 
 func requireProductionRedis(cfg redis.Config) error {
-	if !cfg.Enabled {
+	if cfg.Disable {
 		return nil
 	}
+
 	for _, key := range []string{"GOREST_REDIS_HOST", "GOREST_REDIS_PASSWORD"} {
 		if strings.TrimSpace(os.Getenv(key)) == "" {
 			return fmt.Errorf("%s must be set when Redis is enabled in production", key)
 		}
 	}
+
 	if !cfg.TLS {
 		return fmt.Errorf("GOREST_REDIS_TLS must be true when Redis is enabled in production")
 	}
+
 	return nil
 }
 
 func failConfiguration(err error) {
 	fmt.Fprintf(os.Stderr, "invalid application configuration: %v\n", err)
+
 	os.Exit(1)
 }

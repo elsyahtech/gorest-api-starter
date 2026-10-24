@@ -450,3 +450,57 @@ func (handler *UserHandler) GetUserByID(ctx *gorest.Context) error {
 
 	return response.SendJSON(ctx, response, nil)
 }
+
+// GetUsersFromRedis handles a request to retrieve users stored in Redis.
+func (handler *UserHandler) GetUsersFromRedis(ctx *gorest.Context) error {
+	response := handler.JSON.NewResponse(gorest.Map{
+		"developer": "Elmansyah",
+		"contact":   "https://www.linkedin.com/in/elmansyah",
+		"version":   "v1",
+	})
+
+	data, message, httpCode, err := handler.UserLibrary.GetUsersFromRedis()
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	response.Data = resview.BuildUserResponseArray(data)
+
+	response.WithMessage(message, nil, httpCode)
+
+	return response.SendJSON(ctx, response, nil)
+}
+
+// GetUserFromRedisByID handles a request to retrieve a user by ID from Redis.
+func (handler *UserHandler) GetUserFromRedisByID(ctx *gorest.Context) error {
+	response := handler.JSON.NewResponse(gorest.Map{
+		"developer": "Elmansyah",
+		"contact":   "https://www.linkedin.com/in/elmansyah",
+		"version":   "v1",
+	})
+
+	userID := ctx.Params("id")
+
+	data, message, httpCode, err := handler.UserLibrary.GetUserFromRedisByID(userID)
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	response.Data = resview.BuildUserResponse(data)
+
+	response.WithMessage(message, nil, httpCode)
+
+	return response.SendJSON(ctx, response, nil)
+}

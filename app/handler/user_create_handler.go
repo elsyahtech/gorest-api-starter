@@ -341,3 +341,39 @@ func (handler *UserHandler) CreateUser(ctx *gorest.Context) error {
 
 	return response.SendJSON(ctx, response, nil)
 }
+
+func (handler *UserHandler) CreateUserToRedis(ctx *gorest.Context) error {
+	response := handler.JSON.NewResponse(gorest.Map{
+		"developer": "Elmansyah",
+		"contact":   "https://www.linkedin.com/in/elmansyah",
+		"version":   "v1",
+	})
+
+	var request entity.User
+
+	message, httpCode, err := helper.BodyRequest(ctx, &request)
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	message, httpCode, err = handler.UserLibrary.CreateUserToRedis(&request)
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	response.WithMessage(message, nil, httpCode)
+
+	return response.SendJSON(ctx, response, nil)
+}

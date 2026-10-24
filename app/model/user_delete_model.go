@@ -84,17 +84,8 @@ func (model *UserModel) DeleteUserWithNativeSQL(userID string) (string, int, err
 		}
 	}()
 
-	// Oracle.
-	// query := `DELETE FROM users WHERE id = :1`
-
-	// SQL Server.
-	// query := `DELETE FROM users WHERE id = @p1`
-
-	// MySQL and SQLite.
-	// query := `DELETE FROM users WHERE id = ?`
-
-	// PostgreSQL.
-	query := `DELETE FROM users WHERE id = $1`
+	driver := model.App.GetDBConfig().Driver
+	query := `DELETE FROM users WHERE id = ` + convertPH(driver, 1)
 
 	ctx, cancel := model.App.NewContext(5 * time.Second)
 	defer cancel()
@@ -170,4 +161,36 @@ func (model *UserModel) DeleteUserWithNativeCQL(userID string) (string, int, err
 	}
 
 	return "User deleted successfully", httpCode, nil
+}
+
+// DeleteUserInRedis removes a user from Redis.
+func (model *UserModel) DeleteUserInRedis(userID string) (string, int, error) {
+	if userID == "" {
+		return "User ID is required", http.StatusBadRequest,
+			errors.New("delete user redis: ID is empty")
+	}
+
+	redis := model.App.Redis()
+
+	ctx, cancel := model.App.NewContext(5 * time.Second)
+	defer cancel()
+
+	redisClient, message, httpCode, err := redis.QueryRedis()
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	key := "user:" + userID
+	deleted, err := redisClient.Del(ctx, key).Result()
+	if err != nil {
+		return "Failed to delete user from Redis", http.StatusInternalServerError,
+			fmt.Errorf("delete user redis: %w", err)
+	}
+
+	if deleted == 0 {
+		return "User not found in Redis", http.StatusNotFound,
+			errors.New("delete user redis: no key found for the given ID")
+	}
+
+	return "User deleted successfully from Redis", httpCode, nil
 }

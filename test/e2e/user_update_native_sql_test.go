@@ -21,6 +21,7 @@ func TestUpdateUserWithNativeSQLE2E(t *testing.T) {
 		DepartmentID: "department-update-native-sql-old",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&initial)
 	query := app.Database().Table("users").Create(&initial)
 	if query.Error != nil {
 		t.Fatalf("seed user %s: %s: %v", initial.ID, query.Message, query.Error)

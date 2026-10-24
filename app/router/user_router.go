@@ -56,6 +56,12 @@ func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
 	// Keep this parameter route after the static GET routes above.
 	group.Get("/orm-queries/users/:id", hndlr.GetUserByID)
 
+	// Read users from Redis queries.
+	group.Get("/redis-queries/users", hndlr.GetUsersFromRedis)
+
+	// Read users from Redis queries with a specific ID.
+	group.Get("/redis-queries/users/:id", hndlr.GetUserFromRedisByID)
+
 	// Create users with ORM features.
 	// Some transaction and bulk-write examples call BeginTx. GOREST's
 	// BeginTx/Commit/Rollback calls are no-ops for MongoDB and ScyllaDB.
@@ -71,6 +77,9 @@ func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
 	group.Post("/native-queries/users/mongodb", hndlr.CreateUserWithNativeMongoQuery)
 	group.Post("/native-queries/users/scylla", hndlr.CreateUserWithNativeCQL)
 
+	// Create users with redis query APIs.
+	group.Post("/redis-queries/users", hndlr.CreateUserToRedis)
+
 	// Update users. Register fixed paths before the /:id parameter route.
 	group.Put("/orm-queries/users/bulk", hndlr.UpdateUsersInBulk)
 	group.Put("/orm-queries/users/transaction/:id", hndlr.UpdateUserWithTransaction)
@@ -84,10 +93,16 @@ func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
 	// PATCH changes only the isActive property. Example body: {"isActive":false}.
 	group.Patch("/orm-queries/users/:id", hndlr.PatchUserActiveStatus)
 
+	// Update users in Redis. Register fixed paths before the /:id parameter route.
+	group.Put("/redis-queries/users/:id", hndlr.UpdateUserInRedis)
+
 	// Delete users. Keep fixed paths before the /:id parameter route.
 	group.Delete("/orm-queries/users/transaction/:id", hndlr.DeleteUserWithTransaction)
 	group.Delete("/native-queries/users/sql/:id", hndlr.DeleteUserWithNativeSQL)
 	group.Delete("/native-queries/users/mongodb/:id", hndlr.DeleteUserWithNativeMongoQuery)
 	group.Delete("/native-queries/users/scylla/:id", hndlr.DeleteUserWithNativeCQL)
 	group.Delete("/orm-queries/users/:id", hndlr.DeleteUser)
+
+	// Delete users in Redis. Keep fixed paths before the /:id parameter route.
+	group.Delete("/redis-queries/users/:id", hndlr.DeleteUserInRedis)
 }

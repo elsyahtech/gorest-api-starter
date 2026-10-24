@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	resview "github.com/elsyahtech/gorest-api-starter/app/view"
@@ -341,6 +344,53 @@ func (handler *UserHandler) PatchUserActiveStatus(ctx *gorest.Context) error {
 	if err != nil {
 		response.WithMessage(message, err, httpCode)
 		handler.App.Log(gorest.Map{"error": err}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	response.WithMessage(message, nil, httpCode)
+
+	return response.SendJSON(ctx, response, nil)
+}
+
+func (handler *UserHandler) UpdateUserInRedis(ctx *gorest.Context) error {
+	response := handler.JSON.NewResponse(gorest.Map{
+		"developer": "Elmansyah",
+		"contact":   "https://www.linkedin.com/in/elmansyah",
+		"version":   "v1",
+	})
+
+	var request entity.User
+
+	message, httpCode, err := helper.BodyRequest(ctx, &request)
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	userID := ctx.Params("id")
+	if request.ID != "" && request.ID != userID {
+		message = "User ID in the request must match the URL ID"
+		err = errors.New("update user in Redis: request ID does not match URL ID")
+		response.WithMessage(message, err, http.StatusBadRequest)
+		handler.App.Log(gorest.Map{"error": err}).Error(message)
+		return response.SendJSON(ctx, response, err)
+	}
+
+	request.ID = userID // Ensure the user ID from the URL is set in the request body.
+
+	message, httpCode, err = handler.UserLibrary.UpdateUserInRedis(userID, &request)
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
 
 		return response.SendJSON(ctx, response, err)
 	}

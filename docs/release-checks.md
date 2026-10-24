@@ -12,7 +12,7 @@ go install github.com/zricethezav/gitleaks/v8@v8.30.1
 GOTOOLCHAIN=local make release-check
 ```
 
-The gate first checks the exact Go, golangci-lint, and Gitleaks versions, then runs Go formatting checks, `go vet`, uncached package tests, the pinned baseline linters (`errcheck`, `govet`, `staticcheck`, `ineffassign`, and `unused`), the SQLite driver integration test, Gitleaks against the working tree and full Git history, and a build. It stops with a non-zero status if a check fails. The Make targets are also available individually (`tool-versions`, `format-check`, `vet`, `test`, `lint`, `test-driver-sqlite`, `secret-scan`, and `build`). The broader configured `make lint-full` remains available as a quality backlog check; it currently reports pre-existing findings in the starter's handlers, models, and formatting conventions.
+The gate first checks the exact Go, golangci-lint, and Gitleaks versions. `make tool-versions` can run this check by itself and prints the required and detected versions, then reports whether each matches. The gate then runs Go formatting checks, `go vet`, uncached package tests, the pinned baseline linters (`errcheck`, `govet`, `staticcheck`, `ineffassign`, and `unused`), the SQLite E2E matrix target, Gitleaks against the working tree and full Git history, and a build. It stops with a non-zero status if a check fails. The Make targets are also available individually (`tool-versions`, `format-check`, `vet`, `test`, `lint`, `test-e2e-sqlite`, `secret-scan`, and `build`). The broader configured `make lint-full` remains available as a quality backlog check; it currently reports pre-existing findings in the starter's handlers, models, and formatting conventions.
 
 ## CI evidence
 
@@ -24,4 +24,4 @@ Use the workflow run URL, commit SHA, and downloaded artifact together as the re
 
 The baseline CI gate runs the SQLite driver integration test because it does not need an external database service. It does not claim that PostgreSQL, MySQL, Oracle, SQL Server, MongoDB, or ScyllaDB passed in that CI run. Before a release claims one of those drivers as verified, run the selected integration test against a disposable service using the instructions in [Testing and E2E coverage](./testing.md#optional-database-driver-integration-tests). Record the server and tool versions, connection configuration without credentials, command, commit SHA, and complete test output on that driver's [evidence page](./testing-result.md).
 
-Native MongoDB and ScyllaDB route E2E tests are separate opt-in tests. Their service setup and commands are documented in [Testing and E2E coverage](./testing.md#optional-native-driver-tests).
+Native MongoDB and ScyllaDB route scenarios run as part of `make test-e2e` and its driver-specific targets. Their coverage and container setup are documented in [Testing and E2E coverage](./testing.md#native-driver-routes).

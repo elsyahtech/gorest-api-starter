@@ -1,0 +1,106 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1::6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  postgres:
+    image: postgres:16.3-alpine
+    environment:
+      POSTGRES_DB: gorest_driver_it
+      POSTGRES_USER: gorest_test
+      POSTGRES_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+    ports:
+      - "127.0.0.1::5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gorest_test -d gorest_driver_it"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  oracle:
+    image: gvenzl/oracle-free:23.26.3-slim
+    shm_size: 2g
+    environment:
+      ORACLE_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+      APP_USER: ${GOREST_TEST_DRIVERS_ORACLE_USERNAME:-gorest_test}
+      APP_USER_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+    ports:
+      - "127.0.0.1::1521"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 90
+      start_period: 60s
+
+  mysql:
+    image: mysql:26.7.0
+    command: ["--innodb-use-native-aio=0"]
+    environment:
+      MYSQL_DATABASE: gorest_driver_it
+      MYSQL_USER: gorest_test
+      MYSQL_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+      MYSQL_ROOT_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+    ports:
+      - "127.0.0.1::3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+    ports:
+      - "127.0.0.1::1433"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" >/dev/null 2>&1
+      interval: 10s
+      timeout: 10s
+      retries: 50
+      start_period: 30s
+
+  mongo:
+    image: mongo:8.2.12
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: gorest_test
+      MONGO_INITDB_ROOT_PASSWORD: ${GOREST_TEST_DRIVERS_PASSWORD:-GorestTest!Pass2026}
+    ports:
+      - "127.0.0.1::27017"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test "$$(mongosh --quiet --host 127.0.0.1 --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval "db.adminCommand('ping').ok")" = 1
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  scylla:
+    image: scylladb/scylla:5.4.8
+    platform: linux/amd64
+    command: ["--smp", "1", "--memory", "1G", "--overprovisioned", "1", "--developer-mode", "1"]
+    ports:
+      - "127.0.0.1::9042"
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh \"$$(hostname -i)\" 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 45s

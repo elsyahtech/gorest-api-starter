@@ -1,36 +1,38 @@
 package e2e_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 )
 
 func TestGetUsersWithDepartmentE2E(t *testing.T) {
 	testServer, app := newUserTestServer(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, message, _, err := app.Database().ExecSQL(ctx, `
-		CREATE TABLE departments (
-			id VARCHAR(36) NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			description TEXT,
-			is_active INTEGER NOT NULL DEFAULT 1,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT NULL,
-			deleted_at DATETIME DEFAULT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("create departments table for join E2E: %s: %v", message, err)
-	}
 	path := "/examples/orm-queries/users/join"
 
 	emptyResponse := sendRequest(t, testServer, http.MethodGet, path, nil)
+	if os.Getenv("GOREST_E2E_DRIVER") == "mongo" {
+		if emptyResponse.StatusCode != http.StatusBadRequest {
+			t.Fatalf("GET %s status = %d, want %d for unsupported MongoDB Join(); body: %s",
+				path, emptyResponse.StatusCode, http.StatusBadRequest, emptyResponse.Body)
+		}
+		var result struct {
+			Error   string `json:"error"`
+			Success bool   `json:"success"`
+		}
+		if err := json.Unmarshal(emptyResponse.Body, &result); err != nil {
+			t.Fatalf("decode MongoDB Join() validation response: %v", err)
+		}
+		if result.Success || !strings.Contains(result.Error, "MongoDB Join() requires explicit selected fields") {
+			t.Fatalf("MongoDB Join() error response = %+v, want the documented unsupported-query validation", result)
+		}
+		t.Log("MongoDB Join() returned the expected unsupported-query validation response")
+		return
+	}
 	if emptyResponse.StatusCode != http.StatusOK {
 		t.Fatalf("GET %s status = %d, want %d; body: %s",
 			path, emptyResponse.StatusCode, http.StatusOK, emptyResponse.Body)
@@ -54,6 +56,7 @@ func TestGetUsersWithDepartmentE2E(t *testing.T) {
 		},
 	}
 	for _, department := range departments {
+		ensureE2EDepartmentTimestamp(&department)
 		query := app.Database().Table("departments").Create(&department)
 		if query.Error != nil {
 			t.Fatalf("seed department %s: %s: %v", department.ID, query.Message, query.Error)
@@ -77,6 +80,7 @@ func TestGetUsersWithDepartmentE2E(t *testing.T) {
 		},
 	}
 	for _, user := range users {
+		ensureE2EUserTimestamp(&user)
 		query := app.Database().Table("users").Create(&user)
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

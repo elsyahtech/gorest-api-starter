@@ -36,6 +36,7 @@ func TestGetDepartmentsByUserCountE2E(t *testing.T) {
 		{ID: "user-having-e2e-06", Email: "having-06@example.test", Password: "test-password-06", DepartmentID: "department-having-below-threshold"},
 	}
 	for _, user := range users {
+		ensureE2EUserTimestamp(&user)
 		query := app.Database().Table("users").Create(&user)
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

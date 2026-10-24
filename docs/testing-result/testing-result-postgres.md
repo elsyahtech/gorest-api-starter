@@ -37,3 +37,15 @@ PASS
 Supplemental lifecycle evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=postgres go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
 This evidence applies to the listed PostgreSQL version, driver, source revision, and test configuration only.
+
+## Full route and lifecycle suite
+
+**Run date:** October 24, 2026
+
+**Target:** disposable PostgreSQL 16.3 container, isolated Compose project and network
+
+**Command:** `make test-e2e-postgres`
+
+**Result:** `PASS` on the current working tree.
+
+The target passed the complete in-process route and lifecycle suite against PostgreSQL, including department and order routes, ORM user queries and writes, transactions, bulk operations, native SQL create/read/update/delete, database-startup failure, migration failure, and graceful shutdown. MongoDB and ScyllaDB native route cases are excluded from this SQL-driver run. The runner removed its PostgreSQL container and Compose network after the run. This supplemental evidence is from the working tree and is not part of the source commit listed above.

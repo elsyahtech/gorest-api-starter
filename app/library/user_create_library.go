@@ -223,3 +223,25 @@ func (lib *UserLibrary) CreateUser(req *entity.User) (string, int, error) {
 
 	return message, httpCode, nil
 }
+
+// CreateUserToRedis stores a user in Redis.
+func (lib *UserLibrary) CreateUserToRedis(req *entity.User) (string, int, error) {
+	if req == nil {
+		return "User payload must not be empty", http.StatusBadRequest,
+			errors.New("add user: request is empty")
+	}
+
+	passwordHashed, message, httpCode, err := helper.GenerateArgon(req.Password)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	req.Password = passwordHashed
+
+	message, httpCode, err = lib.UserModel.CreateUserToRedis(req)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return message, httpCode, nil
+}

@@ -36,4 +36,6 @@ After that change, three consecutive runs passed. Each run also passed migration
 
 Supplemental Oracle startup-failure evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=oracle GOREST_DRIVER_LIB_DIR=/Users/elmansyah/oracle/instantclient_19_16 go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
+Supplemental full target evidence ran October 24, 2026 with `make test-e2e-oracle`. Oracle Free 26ai in the disposable Compose container passed the driver integration scenarios and the complete shared route/lifecycle E2E suite, including native SQL CRUD. The run also passed the preload-with-missing-department and zero-limit query cases. The target downloaded and used its temporary Oracle Instant Client package, then removed the container, network, and temporary client files on exit.
+
 This evidence applies to the listed server version, driver, source revision, and test configuration only.

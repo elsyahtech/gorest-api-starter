@@ -80,3 +80,18 @@ func (lib *UserLibrary) DeleteUserWithNativeCQL(userID string) (string, int, err
 
 	return message, httpCode, nil
 }
+
+// DeleteUserInRedis removes a user from Redis.
+func (lib *UserLibrary) DeleteUserInRedis(userID string) (string, int, error) {
+	if userID == "" {
+		return "User ID must not be empty", http.StatusBadRequest,
+			errors.New("delete user: user ID is empty")
+	}
+
+	message, httpCode, err := lib.UserModel.DeleteUserInRedis(userID)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return message, httpCode, nil
+}

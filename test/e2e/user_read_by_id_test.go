@@ -17,6 +17,7 @@ func TestGetUserByIDE2E(t *testing.T) {
 		DepartmentID: "department-by-id-e2e-01",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&expected)
 	query := app.Database().Table("users").Create(&expected)
 	if query.Error != nil {
 		t.Fatalf("seed user %s: %s: %v", expected.ID, query.Message, query.Error)

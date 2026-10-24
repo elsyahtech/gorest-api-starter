@@ -1,33 +1,15 @@
 package e2e_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 )
 
 func TestGetUsersWithPreloadedDepartmentE2E(t *testing.T) {
 	testServer, app := newUserTestServer(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, message, _, err := app.Database().ExecSQL(ctx, `
-		CREATE TABLE departments (
-			id VARCHAR(36) NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			description TEXT,
-			is_active INTEGER NOT NULL DEFAULT 1,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT NULL,
-			deleted_at DATETIME DEFAULT NULL
-		)
-	`)
-	if err != nil {
-		t.Fatalf("create departments table for preload E2E: %s: %v", message, err)
-	}
 	path := "/examples/orm-queries/users/preload"
 
 	emptyResponse := sendRequest(t, testServer, http.MethodGet, path, nil)
@@ -51,6 +33,7 @@ func TestGetUsersWithPreloadedDepartmentE2E(t *testing.T) {
 		Description: "Researches and prototypes new ideas",
 		IsActive:    true,
 	}
+	ensureE2EDepartmentTimestamp(&department)
 	departmentQuery := app.Database().Table("departments").Create(&department)
 	if departmentQuery.Error != nil {
 		t.Fatalf("seed department: %s: %v", departmentQuery.Message, departmentQuery.Error)
@@ -73,6 +56,7 @@ func TestGetUsersWithPreloadedDepartmentE2E(t *testing.T) {
 		},
 	}
 	for _, user := range users {
+		ensureE2EUserTimestamp(&user)
 		query := app.Database().Table("users").Create(&user)
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

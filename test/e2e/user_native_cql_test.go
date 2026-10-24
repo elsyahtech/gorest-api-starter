@@ -151,8 +151,8 @@ func newScyllaUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	if port == "" {
 		port = "9042"
 	}
-	username := os.Getenv("GOREST_SCYLLA_USERNAME")
-	password := os.Getenv("GOREST_SCYLLA_PASSWORD")
+	username := driverTestSetting("GOREST_SCYLLA_USERNAME", "GOREST_DB_USERNAME")
+	password := driverTestSetting("GOREST_SCYLLA_PASSWORD", "GOREST_DB_PASSWORD")
 	dataDir := t.TempDir()
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(dataDir, "logs")
@@ -178,7 +178,7 @@ func newScyllaUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	bootstrapReady = true
 
 	if err := executeScyllaCQL(t, bootstrapApp, fmt.Sprintf(
-		"CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}", keyspace,
+		"CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}", keyspace,
 	)); err != nil {
 		t.Fatalf("create ScyllaDB E2E keyspace: %v", err)
 	}
@@ -219,6 +219,26 @@ func newScyllaUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	return testServer, app
 }
 
+func TestDriverTestSetting(t *testing.T) {
+	t.Setenv("GOREST_DB_USERNAME", "app-user")
+	t.Setenv("GOREST_DB_PASSWORD", "app-test-password")
+	t.Setenv("GOREST_MONGO_USERNAME", "mongo-test-user")
+
+	if got := driverTestSetting("GOREST_MONGO_USERNAME", "GOREST_DB_USERNAME"); got != "mongo-test-user" {
+		t.Fatalf("driver-specific setting = %q, want override %q", got, "mongo-test-user")
+	}
+	if got := driverTestSetting("GOREST_SCYLLA_PASSWORD", "GOREST_DB_PASSWORD"); got != "app-test-password" {
+		t.Fatalf("driver credential fallback = %q, want application database credential", got)
+	}
+}
+
+func driverTestSetting(testKey, appKey string) string {
+	if value, ok := os.LookupEnv(testKey); ok {
+		return value
+	}
+	return os.Getenv(appKey)
+}
+
 func executeScyllaCQL(t *testing.T, app *gorest.App, query string, args ...any) error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -245,7 +265,7 @@ func newScyllaTestApp(
 		DatabaseDirectory: dataDir,
 		Migration:         false,
 		Seeder:            false,
-		Enabled:           true,
+		Disable:           false,
 		Timeout:           10 * time.Second,
 	}
 	app := gorest.New(gorest.Config{

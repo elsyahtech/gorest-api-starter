@@ -53,6 +53,9 @@ func TestDatabaseDriverIntegration(t *testing.T) {
 
 	verifySeedData(t, app)
 	verifyCRUD(t, app, driver)
+	if driver == database.SQLITE || driver == database.POSTGRES || driver == database.MYSQL || driver == database.ORACLE || driver == database.SQLSERVER {
+		verifyNativeSQLRoutes(t, app, driver)
+	}
 	if driver != database.MONGO && driver != database.SCYLLA {
 		verifyTransactionRollback(t, app, driver)
 		verifyMidStepRollback(t, app, driver)
@@ -63,6 +66,53 @@ func TestDatabaseDriverIntegration(t *testing.T) {
 	verifyConcurrentRequests(t, app, driver)
 	verifyConnectionStartupFailure(t, driver)
 	verifyMigrationStartupFailure(t, config, driver)
+}
+
+func verifyNativeSQLRoutes(t *testing.T, app *gorest.App, driver string) {
+	t.Helper()
+	testServer := newUserIntegrationServer(t, app)
+	id := "driver-native-sql-" + driver
+	user := entity.User{
+		ID: id, Email: id + "@example.test", Password: "native-sql-test-password",
+		DepartmentID: "dept-01", IsActive: true,
+	}
+	body, err := json.Marshal(user)
+	if err != nil {
+		t.Fatalf("encode %s native SQL user: %v", driver, err)
+	}
+	path := "/examples/native-queries/users/sql"
+	created := integrationRequest(t, testServer, http.MethodPost, path, body)
+	if created.StatusCode < http.StatusOK || created.StatusCode >= http.StatusMultipleChoices {
+		t.Fatalf("%s native SQL create status = %d, want 2xx; body: %s", driver, created.StatusCode, created.Body)
+	}
+
+	updated := user
+	updated.Email = "updated-" + id + "@example.test"
+	updated.Password = "updated-native-sql-test-password"
+	updatedBody, err := json.Marshal(updated)
+	if err != nil {
+		t.Fatalf("encode %s native SQL update: %v", driver, err)
+	}
+	response := integrationRequest(t, testServer, http.MethodPut, path+"/"+id, updatedBody)
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		t.Fatalf("%s native SQL update status = %d, want 2xx; body: %s", driver, response.StatusCode, response.Body)
+	}
+
+	list := integrationRequest(t, testServer, http.MethodGet, path, nil)
+	if list.StatusCode != http.StatusOK || !bytes.Contains(list.Body, []byte(updated.Email)) {
+		t.Fatalf("%s native SQL read status/body do not include updated user: status=%d body=%s", driver, list.StatusCode, list.Body)
+	}
+
+	deleted := integrationRequest(t, testServer, http.MethodDelete, path+"/"+id, nil)
+	if deleted.StatusCode < http.StatusOK || deleted.StatusCode >= http.StatusMultipleChoices {
+		t.Fatalf("%s native SQL delete status = %d, want 2xx; body: %s", driver, deleted.StatusCode, deleted.Body)
+	}
+	var persisted entity.User
+	query := app.Database().Table("users").Where("id = ?", id).Find(&persisted)
+	if query.Error == nil {
+		t.Fatalf("%s native SQL delete left user persisted: %+v", driver, persisted)
+	}
+	t.Logf("%s native SQL route create/read/update/delete passed", driver)
 }
 
 func TestDatabaseDriverStartupFailsWithoutDatabase(t *testing.T) {
@@ -167,7 +217,7 @@ func integrationDatabaseConfig(t *testing.T, driver string) (database.Config, st
 		ConnectionMaxLifetime:  time.Minute,
 		MaxOpenConnections:     5,
 		MaxIdleConnections:     2,
-		Enabled:                true,
+		Disable:                false,
 		Migration:              true,
 		Seeder:                 true,
 		TrustServerCertificate: true,

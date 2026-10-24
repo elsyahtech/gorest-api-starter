@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/elsyahtech/gorest"
@@ -44,13 +43,7 @@ func newOrderTestServerWithUsers(t *testing.T, userCount int) (*server.Server, [
 
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(dataDir, "logs")
-	databaseConfig := database.Config{
-		Driver:            database.SQLITE,
-		Name:              "order-e2e",
-		DatabaseDirectory: dataDir,
-		Migration:         true,
-		Enabled:           true,
-	}
+	databaseConfig := e2eDatabaseConfig(t, dataDir, "order-e2e")
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-order-e2e",
 		Version:     "test",
@@ -67,7 +60,10 @@ func newOrderTestServerWithUsers(t *testing.T, userCount int) (*server.Server, [
 		}
 	})
 	if err := app.RunDatabaseStartupTasks(); err != nil {
-		t.Fatalf("run SQLite user and order migrations: %v", err)
+		t.Fatalf("run %s user and order migrations: %v", databaseConfig.Driver, err)
+	}
+	if databaseConfig.Driver != database.SQLITE {
+		resetSQLTestTables(t, app)
 	}
 
 	userIDs := make([]string, 0, userCount)
@@ -99,26 +95,7 @@ func newOrderTestServerWithUsers(t *testing.T, userCount int) (*server.Server, [
 
 func copyOrderMigrations(t *testing.T, dataDir string) {
 	t.Helper()
-
-	_, sourceFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source file")
-	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "../.."))
-	migrationDir := filepath.Join(dataDir, "migrations", "sqlite")
-	if err := os.MkdirAll(migrationDir, 0o755); err != nil {
-		t.Fatalf("create temporary migration directory: %v", err)
-	}
-
 	for _, name := range []string{"002_create_users_table.sql", "003_create_orders_table.sql"} {
-		source := filepath.Join(repositoryRoot, "app", "database", "migrations", "sqlite", name)
-		migration, err := os.ReadFile(source)
-		if err != nil {
-			t.Fatalf("read migration %q: %v", name, err)
-		}
-		destination := filepath.Join(migrationDir, name)
-		if err := os.WriteFile(destination, migration, 0o600); err != nil {
-			t.Fatalf("write migration %q: %v", name, err)
-		}
+		copyE2EMigration(t, dataDir, name)
 	}
 }

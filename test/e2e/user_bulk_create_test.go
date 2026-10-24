@@ -121,6 +121,7 @@ func TestCreateUsersInBulkRollsBackOnDatabaseErrorE2E(t *testing.T) {
 		DepartmentID: "department-bulk-existing",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&existing)
 	query := app.Database().Table("users").Create(&existing)
 	if query.Error != nil {
 		t.Fatalf("seed existing user: %s: %v", query.Message, query.Error)
