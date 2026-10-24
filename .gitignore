@@ -53,7 +53,8 @@ go.work.sum
 
 # Generated application artifacts
 /bin/
-logs/
+/logs/
+/app/database/var/
 *.log
 *.tmp
 *.swp

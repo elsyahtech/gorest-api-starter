@@ -119,8 +119,10 @@ func newMongoUserTestServer(t *testing.T) (*server.Server, *gorest.App, string) 
 	}
 	port := os.Getenv("GOREST_MONGO_PORT")
 	if port == "" {
-		port = "27018"
+		port = "27017"
 	}
+	username := driverTestSetting("GOREST_MONGO_USERNAME", "GOREST_DB_USERNAME")
+	password := driverTestSetting("GOREST_MONGO_PASSWORD", "GOREST_DB_PASSWORD")
 
 	dataDir := t.TempDir()
 	workingDir, err := os.Getwd()
@@ -143,12 +145,14 @@ func newMongoUserTestServer(t *testing.T) (*server.Server, *gorest.App, string) 
 		Driver:            database.MONGO,
 		Host:              host,
 		Port:              port,
+		Username:          username,
+		Password:          password,
 		Name:              databaseName,
 		TLS:               "false",
 		DatabaseDirectory: dataDir,
 		Migration:         false,
 		Seeder:            false,
-		Enabled:           true,
+		Disable:           false,
 		Timeout:           5 * time.Second,
 	}
 	app := gorest.New(gorest.Config{

@@ -22,6 +22,7 @@ func TestUpdateUserWithSelectedColumnsE2E(t *testing.T) {
 		IsActive:     true,
 		UpdatedAt:    &initialUpdatedAt,
 	}
+	ensureE2EUserTimestamp(&initial)
 	query := app.Database().Table("users").Create(&initial)
 	if query.Error != nil {
 		t.Fatalf("seed user %s: %s: %v", initial.ID, query.Message, query.Error)

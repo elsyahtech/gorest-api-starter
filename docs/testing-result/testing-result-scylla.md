@@ -36,4 +36,8 @@ PASS
 
 Supplemental lifecycle evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=scylla go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
+Supplemental E2E evidence ran October 24, 2026 with `make test-e2e-scylla`. The disposable ScyllaDB 5.4.8 container passed migration/seeder, ORM CRUD, conflicts, concurrency, startup failure, and shutdown checks. The shared ORM route/lifecycle suite passed for operations supported by the ScyllaDB CQL schema/API. The runner explicitly omits email-keyed upsert, duplicate-key rejection, joins, non-key `DISTINCT`/`GROUP BY`, `HAVING`, and global `ORDER BY`/`OFFSET`, because these scenarios rely on SQL-style behavior not supported by the current ScyllaDB implementation. ORM transaction-atomicity cases are also not applicable. All four native CQL route scenarios (create, read, update, delete) passed in their separate stage. The run used a temporary keyspace with `NetworkTopologyStrategy` to support tablet replication. The target removed its container and network after completion.
+
+The shared ORM suite and native CQL routes are separate stages: the first exercises the common model and route behavior that this driver supports, while the second exercises driver-specific CQL implementations. The differing feature set is printed by the runner before tests start.
+
 This evidence applies to the listed server version, driver, source revision, and test configuration only.

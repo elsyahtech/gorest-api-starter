@@ -36,6 +36,7 @@ func TestGetUsersWithDistinctDepartmentIDsE2E(t *testing.T) {
 		{ID: "user-distinct-e2e-05", Email: "distinct-05@example.test", Password: "test-password-05", DepartmentID: "department-distinct-b"},
 	}
 	for _, user := range users {
+		ensureE2EUserTimestamp(&user)
 		query := app.Database().Table("users").Create(&user)
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

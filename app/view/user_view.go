@@ -10,12 +10,16 @@ func BuildUserResponse(response *entity.User) *entity.UserResponse {
 	if response == nil {
 		return nil
 	}
+	department := response.Department
+	if department != nil && department.ID == "" {
+		department = nil
+	}
 
 	return &entity.UserResponse{
 		ID:           response.ID,
 		Email:        response.Email,
 		DepartmentID: response.DepartmentID,
-		Department:   response.Department,
+		Department:   department,
 		IsActive:     response.IsActive,
 		CreatedAt:    helper.ConvertTimeToString(response.CreatedAt),
 		UpdatedAt:    helper.ConvertTimePointerToStringPointer(response.UpdatedAt),

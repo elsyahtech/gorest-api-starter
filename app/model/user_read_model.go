@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -157,7 +159,7 @@ func (model *UserModel) GetUsersWithPreloadedDepartment() (*entity.UserArray, st
 
 	query := database.
 		Table("users").
-		Select("users.*, departments.name, departments.description").
+		Select("*").
 		Preload("Department").
 		Find(&users)
 	if query.Error != nil {
@@ -344,6 +346,11 @@ func (model *UserModel) GetUsersWithNativeCQL() (*entity.UserArray, string, int,
 
 // GetUsersByLimit returns at most limit users.
 func (model *UserModel) GetUsersByLimit(limit int) (*entity.UserArray, string, int, error) {
+	if limit == 0 {
+		users := make(entity.UserArray, 0)
+		return &users, "", http.StatusOK, nil
+	}
+
 	database := model.App.Database()
 
 	var users entity.UserArray
@@ -398,4 +405,85 @@ func (model *UserModel) GetUserByID(userID string) (*entity.User, string, int, e
 	}
 
 	return &user, "", query.HTTPCode, nil
+}
+
+// GetUsersFromRedis retrieves users stored in Redis.
+func (model *UserModel) GetUsersFromRedis() (*entity.UserArray, string, int, error) {
+	redis := model.App.Redis()
+	ctx, cancel := model.App.NewContext(5 * time.Second)
+	defer cancel()
+
+	redisClient, message, httpCode, err := redis.QueryRedis()
+	if err != nil {
+		return nil, message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	var users entity.UserArray
+
+	iter := redisClient.Scan(ctx, 0, "user:*", 0).Iterator()
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+		var user entity.User
+
+		jsonData, err := redisClient.Get(ctx, key).Bytes()
+		if err != nil {
+			return nil, "Failed to retrieve user data from Redis", http.StatusInternalServerError,
+				fmt.Errorf("failed to get user data from Redis for key %s: %w", key, err)
+		}
+
+		err = json.Unmarshal(jsonData, &user)
+		if err != nil {
+			return nil, "Failed to unmarshal user data from Redis", http.StatusInternalServerError,
+				fmt.Errorf("failed to unmarshal user data from Redis for key %s: %w", key, err)
+		}
+
+		users = append(users, user)
+	}
+
+	if err := iter.Err(); err != nil {
+		return nil, "Failed to scan user keys from Redis", http.StatusInternalServerError,
+			fmt.Errorf("redis scan iterator error: %w", err)
+	}
+
+	return &users, "Users retrieved successfully from Redis", httpCode, nil
+}
+
+// GetUserFromRedisByID retrieves a user by ID from Redis.
+func (model *UserModel) GetUserFromRedisByID(userID string) (*entity.User, string, int, error) {
+	if userID == "" {
+		return nil, "User ID param must not be empty", http.StatusBadRequest,
+			errors.New("get user from Redis by ID: user ID is empty")
+	}
+
+	getRedis := model.App.Redis()
+	ctx, cancel := model.App.NewContext(5 * time.Second)
+	defer cancel()
+
+	redisClient, message, httpCode, err := getRedis.QueryRedis()
+	if err != nil {
+		return nil, message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	key := "user:" + userID
+	jsonData, err := redisClient.Get(ctx, key).Bytes()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, "User not found in Redis", http.StatusNotFound,
+				fmt.Errorf("user with ID %s not found in Redis: %w", userID, err)
+		}
+
+		return nil, "Failed to retrieve user data from Redis", http.StatusInternalServerError,
+			fmt.Errorf("failed to get user data from Redis for key %s: %w", key, err)
+	}
+
+	var user entity.User
+
+	err = json.Unmarshal(jsonData, &user)
+	if err != nil {
+		return nil, "Failed to unmarshal user data from Redis", http.StatusInternalServerError,
+			fmt.Errorf("failed to unmarshal user data from Redis for key %s: %w", key, err)
+	}
+
+	return &user, "User retrieved successfully from Redis", httpCode, nil
 }

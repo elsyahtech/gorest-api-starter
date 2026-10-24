@@ -37,4 +37,6 @@ PASS
 
 Supplemental lifecycle evidence ran October 23, 2026 against the working tree based on the listed source commit: `GOREST_DRIVER_LIFECYCLE_DRIVER=sqlserver go test -v -count=1 -timeout=2m ./test/drivers -run '^TestDatabaseDriverStartupFailsWithoutDatabase$'` passed. The shared app-level lifecycle E2E selection also passed as recorded in [the result index](../testing-result.md). These supplemental test-harness changes are not yet committed.
 
+Supplemental full target evidence ran October 24, 2026 with `make test-e2e-sqlserver`. The disposable SQL Server 2022 container passed driver integration and the complete shared route/lifecycle E2E suite, including native SQL CRUD, preload, and pagination. This run exposed SQL Server's rejection of `FETCH NEXT 0`; the model now returns an empty result directly for a zero limit, and the scenario passed. The target removed its container and network after completion.
+
 This evidence applies to the listed server version, driver, source revision, and test configuration only.

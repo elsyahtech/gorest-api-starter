@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest/server"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -26,6 +27,7 @@ func Server() server.Config {
 	if err != nil {
 		panic(err)
 	}
+
 	return cfg
 }
 
@@ -35,33 +37,44 @@ func LoadServer() (server.Config, error) {
 	if err := validateEnvironment(); err != nil {
 		return server.Config{}, err
 	}
+
 	port := 3000
+
 	if value, ok := os.LookupEnv("GOREST_SERVER_PORT"); ok {
 		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+
 		if err != nil || parsed < 1 || parsed > 65535 {
 			return server.Config{}, fmt.Errorf("GOREST_SERVER_PORT must be an integer between 1 and 65535")
 		}
+
 		port = parsed
 	}
+
 	host := envString("GOREST_SERVER_HOST", "127.0.0.1")
 	origins := csvEnv("GOREST_CORS_ORIGINS")
+
 	if len(origins) == 0 {
 		origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
-	if Environment() == "production" {
+
+	if Environment() == gorest.Production {
 		if err := requireProductionEnv("GOREST_SERVER_HOST"); err != nil {
 			return server.Config{}, err
 		}
+
 		if err := requireProductionEnv("GOREST_SERVER_PORT"); err != nil {
 			return server.Config{}, err
 		}
+
 		if err := requireProductionEnv("GOREST_CORS_ORIGINS"); err != nil {
 			return server.Config{}, err
 		}
+
 		if len(csvEnv("GOREST_CORS_ORIGINS")) == 0 {
 			return server.Config{}, fmt.Errorf("GOREST_CORS_ORIGINS must contain at least one origin when APP_ENV=production")
 		}
 	}
+
 	return server.Config{
 		// Keep request timeouts finite and cap the body size. These timeout values
 		// match GOREST defaults; adjust them for the application's workload.
@@ -110,15 +123,20 @@ func LoadServer() (server.Config, error) {
 
 func csvEnv(key string) []string {
 	value := strings.TrimSpace(os.Getenv(key))
+
 	if value == "" {
 		return []string{}
 	}
+
 	items := strings.Split(value, ",")
+
 	result := make([]string, 0, len(items))
+
 	for _, item := range items {
 		if trimmed := strings.TrimSpace(item); trimmed != "" {
 			result = append(result, trimmed)
 		}
 	}
+
 	return result
 }

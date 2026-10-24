@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS orders (
     id text,
     user_id text,
     order_number text,
-    total_amount decimal,
+    total_amount double,
     status text,
     is_active boolean,
     created_at timestamp,

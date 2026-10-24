@@ -31,6 +31,7 @@ func TestUpdateUsersInBulkE2E(t *testing.T) {
 		},
 	}
 	for i := range initialUsers {
+		ensureE2EUserTimestamp(&initialUsers[i])
 		query := app.Database().Table("users").Create(&initialUsers[i])
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", initialUsers[i].ID, query.Message, query.Error)
@@ -106,12 +107,13 @@ func TestUpdateUsersInBulkE2E(t *testing.T) {
 func TestUpdateUsersInBulkRejectsMissingUserE2E(t *testing.T) {
 	testServer, app := newUserTestServer(t)
 	existing := entity.User{
-		ID:           "user-bulk-update-missing-e2e-existing",
+		ID:           "user-bulk-update-existing",
 		Email:        "bulk-update-existing@example.test",
 		Password:     "existing-password",
 		DepartmentID: "department-bulk-update-existing",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&existing)
 	query := app.Database().Table("users").Create(&existing)
 	if query.Error != nil {
 		t.Fatalf("seed existing user: %s: %v", query.Message, query.Error)
@@ -122,11 +124,11 @@ func TestUpdateUsersInBulkRejectsMissingUserE2E(t *testing.T) {
 			ID:           existing.ID,
 			Email:        "bulk-update-existing-changed@example.test",
 			Password:     "changed-existing-password",
-			DepartmentID: "department-bulk-update-existing-changed",
+			DepartmentID: "dept-bulk-update-existing-changed",
 			IsActive:     false,
 		},
 		{
-			ID:           "user-bulk-update-e2e-missing",
+			ID:           "user-bulk-update-missing",
 			Email:        "bulk-update-missing@example.test",
 			Password:     "missing-user-password",
 			DepartmentID: "department-bulk-update-missing",
@@ -161,12 +163,13 @@ func TestUpdateUsersInBulkRejectsMissingUserE2E(t *testing.T) {
 func TestUpdateUsersInBulkRejectsDuplicatePrimaryKeyE2E(t *testing.T) {
 	testServer, app := newUserTestServer(t)
 	existing := entity.User{
-		ID:           "user-bulk-update-duplicate-e2e-01",
+		ID:           "user-bulk-update-duplicate",
 		Email:        "bulk-update-duplicate-original@example.test",
 		Password:     "original-password",
-		DepartmentID: "department-bulk-update-duplicate-original",
+		DepartmentID: "dept-bulk-dup-original",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&existing)
 	query := app.Database().Table("users").Create(&existing)
 	if query.Error != nil {
 		t.Fatalf("seed user: %s: %v", query.Message, query.Error)
@@ -177,14 +180,14 @@ func TestUpdateUsersInBulkRejectsDuplicatePrimaryKeyE2E(t *testing.T) {
 			ID:           existing.ID,
 			Email:        "bulk-update-duplicate-first@example.test",
 			Password:     "first-updated-password",
-			DepartmentID: "department-bulk-update-duplicate-first",
+			DepartmentID: "dept-bulk-dup-first",
 			IsActive:     false,
 		},
 		{
 			ID:           existing.ID,
 			Email:        "bulk-update-duplicate-second@example.test",
 			Password:     "second-updated-password",
-			DepartmentID: "department-bulk-update-duplicate-second",
+			DepartmentID: "dept-bulk-dup-second",
 			IsActive:     false,
 		},
 	}

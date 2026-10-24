@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -44,13 +43,7 @@ func newDepartmentTestServer(t *testing.T) *server.Server {
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(dataDir, "logs")
 
-	databaseConfig := database.Config{
-		Driver:            database.SQLITE,
-		Name:              "department-e2e",
-		DatabaseDirectory: dataDir,
-		Migration:         true,
-		Enabled:           true,
-	}
+	databaseConfig := e2eDatabaseConfig(t, dataDir, "department-e2e")
 
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-e2e",
@@ -69,7 +62,10 @@ func newDepartmentTestServer(t *testing.T) *server.Server {
 	})
 
 	if err := app.RunDatabaseStartupTasks(); err != nil {
-		t.Fatalf("run SQLite department migration: %v", err)
+		t.Fatalf("run %s department migration: %v", databaseConfig.Driver, err)
+	}
+	if databaseConfig.Driver != database.SQLITE {
+		resetSQLTestTables(t, app)
 	}
 
 	testServer, _, err := server.New(&server.ConfigDefault)
@@ -130,23 +126,5 @@ func sendRequest(t *testing.T, testServer *server.Server, method, path string, b
 
 func copyDepartmentMigration(t *testing.T, dataDir string) {
 	t.Helper()
-
-	_, sourceFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source file")
-	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "../.."))
-	source := filepath.Join(repositoryRoot, "app/database/migrations/sqlite/001_create_departments_table.sql")
-	destination := filepath.Join(dataDir, "migrations", "sqlite", filepath.Base(source))
-
-	migration, err := os.ReadFile(source)
-	if err != nil {
-		t.Fatalf("read department migration: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-		t.Fatalf("create temporary migration directory: %v", err)
-	}
-	if err := os.WriteFile(destination, migration, 0o600); err != nil {
-		t.Fatalf("write temporary department migration: %v", err)
-	}
+	copyE2EMigration(t, dataDir, "001_create_departments_table.sql")
 }

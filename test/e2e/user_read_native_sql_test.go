@@ -66,8 +66,10 @@ func TestGetUsersWithNativeSQLE2E(t *testing.T) {
 	deletedAt := now.Add(time.Minute)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	deletedAtPlaceholder := e2eSQLPlaceholder(1)
+	userIDPlaceholder := e2eSQLPlaceholder(2)
 	_, message, _, err := app.Database().ExecSQL(ctx,
-		"UPDATE users SET deleted_at = ? WHERE id = ?",
+		"UPDATE users SET deleted_at = "+deletedAtPlaceholder+" WHERE id = "+userIDPlaceholder,
 		deletedAt,
 		users[2].ID,
 	)

@@ -14,7 +14,7 @@ Start with the [documentation index](./docs/README.md). The guides are ordered a
 4. [Database guide](./docs/database.md) — drivers, migrations, seeders, and transaction limits.
 5. [Configuration and deployment](./docs/configuration.md) — server, database, logging, and security considerations.
 6. [Adding features](./docs/extending.md) — a step-by-step guide to extend the starter consistently.
-7. [Testing and E2E coverage](./docs/testing.md) — run the suite, generate coverage, and enable optional database tests.
+7. [Testing and E2E coverage](./docs/testing.md) — run the suite, generate coverage, and verify the seven database drivers.
 
 These guides describe this application, not every framework feature. For GOREST framework APIs and behavior, see the [GOREST v1.0.2 documentation](https://github.com/elsyahtech/gorest/tree/v1.0.2/docs).
 
@@ -54,20 +54,23 @@ For complete setup steps, payload examples, and endpoint behavior, use [Getting 
 ## Development checks
 
 ```sh
-make test      # go test ./...
-make check     # go vet ./... and go test ./...
+make test      # run all Go tests with per-test progress
+make check     # run go vet and all Go tests with progress and summaries
+make tool-versions # verify pinned Go, golangci-lint, and Gitleaks versions
 make lint      # pinned baseline golangci-lint checks (install separately)
 make lint-full # all configured linters, including the quality backlog
 make build     # build bin/gorest-api-starter
-make test-e2e  # run E2E tests; external database tests are skipped unless enabled
-make test-mongo   # run opt-in MongoDB tests (requires a local service)
-make test-scylla  # run opt-in ScyllaDB tests (requires a local service)
-make test-drivers # run disposable database integration checks across drivers
+make test-e2e          # run the complete isolated E2E matrix for all seven drivers
+make test-e2e-sqlite   # run the matrix for one driver (same targets exist for all drivers)
 make coverage     # generate SQLite E2E coverage.out and coverage.html
-make coverage-e2e # include opt-in MongoDB and ScyllaDB tests
+make coverage-e2e # generate combined native-driver coverage (services required)
 make push          # secret-scan, then interactively sanitize, stage, commit, and optionally push
 ```
 
-See the [testing and E2E guide](./docs/testing.md) for service setup, environment variables, coverage details, and test limitations. The default suite includes SQLite-backed HTTP E2E tests; MongoDB and ScyllaDB HTTP tests are opt-in. A passing test or build does not establish that every example works with every supported database driver.
+`make test` runs the standard Go suite without starting external database services. `make test-e2e` is the isolated database workflow: it runs the verification scenarios against disposable containers for all seven drivers, including native SQL routes for the five SQL drivers, native MongoDB routes, and native CQL routes for ScyllaDB. It requires Docker and uses additional time, disk, and memory, especially for Oracle. Driver-specific targets (`make test-e2e-postgres`, `make test-e2e-mysql`, `make test-e2e-oracle`, `make test-e2e-sqlserver`, `make test-e2e-mongo`, `make test-e2e-scylla`, and `make test-e2e-sqlite`) run one part of the same matrix. See the [testing guide](./docs/testing.md) for prerequisites and scenario coverage.
+
+The automated database testing supports macOS and Linux. Windows is not currently in the verified testing scope.
+
+See the [testing and E2E guide](./docs/testing.md) for environment variables, coverage details, and test limitations. A passing test or build does not establish that every example works with every supported database driver.
 
 `make push` runs Gitleaks against the current working tree and Git history before sanitizing or staging. It then asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming. The sanitizer is a narrow helper; Gitleaks is the repository and history scanner.

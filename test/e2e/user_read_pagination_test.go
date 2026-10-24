@@ -20,6 +20,7 @@ func TestGetUsersByLimitOffsetE2E(t *testing.T) {
 		{ID: "user-page-e2e-02", Email: "page-02@example.test", Password: "test-password-02", DepartmentID: "department-page-e2e-02", IsActive: false},
 	}
 	for _, user := range users {
+		ensureE2EUserTimestamp(&user)
 		query := app.Database().Table("users").Create(&user)
 		if query.Error != nil {
 			t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

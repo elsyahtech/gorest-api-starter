@@ -164,3 +164,28 @@ func (lib *UserLibrary) GetUserByID(userID string) (*entity.User, string, int, e
 
 	return result, message, httpCode, nil
 }
+
+// GetUsersFromRedis retrieves users stored in Redis.
+func (lib *UserLibrary) GetUsersFromRedis() (*entity.UserArray, string, int, error) {
+	result, message, httpCode, err := lib.UserModel.GetUsersFromRedis()
+	if err != nil {
+		return nil, message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return result, message, httpCode, nil
+}
+
+// GetUserFromRedisByID retrieves a user by ID from Redis.
+func (lib *UserLibrary) GetUserFromRedisByID(userID string) (*entity.User, string, int, error) {
+	if userID == "" {
+		return nil, "User ID param must not be empty", http.StatusBadRequest,
+			errors.New("get user from Redis by ID: user ID is empty")
+	}
+
+	result, message, httpCode, err := lib.UserModel.GetUserFromRedisByID(userID)
+	if err != nil {
+		return nil, message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return result, message, httpCode, nil
+}

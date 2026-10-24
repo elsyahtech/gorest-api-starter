@@ -63,7 +63,7 @@ func TestMigrationFailureAbortsStartupTasks(t *testing.T) {
 
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(t.TempDir(), "logs")
-	app := gorest.New(gorest.Config{AppName: "lifecycle-migration-test", Environment: "test", Timezone: "UTC", Debug: true})
+	app := gorest.New(gorest.Config{AppName: "lifecycle-migration-test", Environment: gorest.Testing, Timezone: "UTC", Debug: true})
 	databaseConfig := database.ConfigDefault
 	databaseConfig.Driver = database.SQLITE
 	databaseConfig.Name = "lifecycle-migration-failure"
@@ -204,7 +204,7 @@ func TestLifecycleSubprocess(t *testing.T) {
 	case "database-failure":
 		logConfig := gorestlog.ConfigDefault
 		logConfig.LogDir = os.Getenv("GOREST_LIFECYCLE_LOG_DIR")
-		app := gorest.New(gorest.Config{AppName: "lifecycle-db-failure", Environment: "test", Timezone: "UTC", Debug: true})
+		app := gorest.New(gorest.Config{AppName: "lifecycle-db-failure", Environment: gorest.Testing, Timezone: "UTC", Debug: true})
 		databaseConfig := database.ConfigDefault
 		databaseConfig.Driver = database.POSTGRES
 		databaseConfig.Host = "127.0.0.1"
@@ -227,7 +227,7 @@ func TestLifecycleSubprocess(t *testing.T) {
 			t.Fatalf("parse lifecycle HTTP port: %v", err)
 		}
 		serverConfig.Port = port
-		app := gorest.New(gorest.Config{AppName: "lifecycle-shutdown", Environment: "test", Timezone: "UTC"})
+		app := gorest.New(gorest.Config{AppName: "lifecycle-shutdown", Environment: gorest.Testing, Timezone: "UTC"})
 		app.Use(gorestlog.Run(logConfig), server.Run(serverConfig))
 		app.RegisterServices([]gorest.RouterRegistrar{
 			func(app *gorest.App) {

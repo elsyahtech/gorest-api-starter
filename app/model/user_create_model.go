@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -171,43 +172,29 @@ func (model *UserModel) CreateUserWithNativeSQL(req *entity.User) (string, int, 
 		}
 	}()
 
-	req.CreatedAt = time.Now()
+	driver := model.App.GetDBConfig().Driver
 
-	// Oracle.
-	// query := `
-	// 	INSERT INTO users (id, email, password, department_id, is_active, created_at)
-	// 	VALUES (:1, :2, :3, :4, :5, :6)
-	// `
-
-	// SQL Server.
-	// query := `
-	// 	INSERT INTO users (id, email, password, department_id, is_active, created_at)
-	// 	VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
-	// `
-
-	// MySQL and SQLite.
-	// query := `
-	// 	INSERT INTO users (id, email, password, department_id, is_active, created_at)
-	// 	VALUES (?, ?, ?, ?, ?, ?)
-	// `
-
-	// PostgreSQL.
 	query := `
 		INSERT INTO users (id, email, password, department_id, is_active, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (` + ph(driver, 6) + `)
 	`
 
 	ctx, cancel := model.App.NewContext(5 * time.Second)
 	defer cancel()
+
+	isActive := convertBooleanToInt(req.IsActive)
+
+	req.CreatedAt = time.Now()
 
 	_, message, httpCode, err = transaction.ExecSQL(ctx, query,
 		req.ID,
 		req.Email,
 		req.Password,
 		req.DepartmentID,
-		req.IsActive,
+		isActive,
 		req.CreatedAt,
 	)
+
 	if err != nil {
 		return message, httpCode, fmt.Errorf("%w", err)
 	}
@@ -313,4 +300,46 @@ func (model *UserModel) CreateUser(req *entity.User) (string, int, error) {
 	}
 
 	return query.Message, query.HTTPCode, nil
+}
+
+// CreateUserToRedis stores a user in Redis.
+func (model *UserModel) CreateUserToRedis(req *entity.User) (string, int, error) {
+	if req == nil {
+		return "User payload must not be empty", http.StatusBadRequest,
+			errors.New("add user: request is empty")
+	}
+	if req.ID == "" {
+		return "User ID must not be empty", http.StatusBadRequest,
+			errors.New("add user to Redis: user ID is empty")
+	}
+
+	redis := model.App.Redis()
+	ctx, cancel := model.App.NewContext(5 * time.Second)
+	defer cancel()
+
+	redisClient, message, httpCode, err := redis.QueryRedis()
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	user := *req
+	user.CreatedAt = time.Now()
+
+	jsonBytes, err := json.Marshal(user)
+	if err != nil {
+		return "Failed to process user data", http.StatusInternalServerError, fmt.Errorf("failed to marshal user: %w", err)
+	}
+
+	redisKey := fmt.Sprintf("user:%s", user.ID)
+
+	created, err := redisClient.SetNX(ctx, redisKey, jsonBytes, 0).Result()
+	if err != nil {
+		return "Failed to save user in Redis", http.StatusInternalServerError, fmt.Errorf("failed to create user in Redis: %w", err)
+	}
+	if !created {
+		return "User already exists in Redis", http.StatusConflict,
+			errors.New("create user in Redis: key already exists")
+	}
+
+	return "User created successfully in Redis", httpCode, nil
 }

@@ -32,6 +32,7 @@ func TestUserHeadRoutesE2E(t *testing.T) {
 		DepartmentID: "department-head-e2e-01",
 		IsActive:     true,
 	}
+	ensureE2EUserTimestamp(&user)
 	query := app.Database().Table("users").Create(&user)
 	if query.Error != nil {
 		t.Fatalf("seed user %s: %s: %v", user.ID, query.Message, query.Error)

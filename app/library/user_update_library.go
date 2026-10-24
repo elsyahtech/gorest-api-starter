@@ -240,3 +240,30 @@ func (lib *UserLibrary) PatchUserActiveStatus(userID string, req *entity.UserAct
 
 	return message, httpCode, nil
 }
+
+// UpdateUserInRedis updates a user's data in Redis.
+func (lib *UserLibrary) UpdateUserInRedis(userID string, req *entity.User) (string, int, error) {
+	if userID == "" {
+		return "User ID param must not be empty", http.StatusBadRequest,
+			errors.New("update user: user ID is empty")
+	}
+
+	if req == nil {
+		return "User payload must not be empty", http.StatusBadRequest,
+			errors.New("update user: payload is empty")
+	}
+
+	passwordHashed, message, httpCode, err := helper.GenerateArgon(req.Password)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	req.Password = passwordHashed
+
+	message, httpCode, err = lib.UserModel.UpdateUserInRedis(userID, req)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return message, httpCode, nil
+}

@@ -98,4 +98,4 @@ When changing an entity, check all dependent layers: request validation, model q
 
 ## Driver boundaries
 
-The starter includes ORM and native query examples for selected drivers, but does not guarantee identical behavior across them. The native SQL user examples use PostgreSQL syntax. MongoDB and ScyllaDB use their native APIs. GOREST `BeginTx`, `Commit`, and `Rollback` calls do not provide SQL-style transaction atomicity for MongoDB and ScyllaDB in these examples. See the [database guide](./database.md) before adapting these operations.
+The starter includes ORM and native query examples for selected drivers, but does not guarantee identical behavior across them. Native SQL parameter markers are selected for the configured SQL driver, and the routes are tested on SQLite, PostgreSQL, MySQL, Oracle, and SQL Server; other SQL syntax and behavior may still differ. MongoDB and ScyllaDB use their native APIs. GOREST `BeginTx`, `Commit`, and `Rollback` calls do not provide SQL-style transaction atomicity for MongoDB and ScyllaDB in these examples. See the [database guide](./database.md) before adapting these operations.

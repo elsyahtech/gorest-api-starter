@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/elsyahtech/gorest"
@@ -417,13 +416,7 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(dataDir, "logs")
-	databaseConfig := database.Config{
-		Driver:            database.SQLITE,
-		Name:              "user-e2e",
-		DatabaseDirectory: dataDir,
-		Migration:         true,
-		Enabled:           true,
-	}
+	databaseConfig := e2eDatabaseConfig(t, dataDir, "user-e2e")
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-user-e2e",
 		Version:     "test",
@@ -440,7 +433,10 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 		}
 	})
 	if err := app.RunDatabaseStartupTasks(); err != nil {
-		t.Fatalf("run SQLite user migration: %v", err)
+		t.Fatalf("run %s user migration: %v", databaseConfig.Driver, err)
+	}
+	if databaseConfig.Driver != database.SQLITE {
+		resetSQLTestTables(t, app)
 	}
 
 	testServer, _, err := server.New(&server.ConfigDefault)
@@ -457,23 +453,6 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 
 func copyUserMigration(t *testing.T, dataDir string) {
 	t.Helper()
-
-	_, sourceFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source file")
-	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "../.."))
-	source := filepath.Join(repositoryRoot, "app", "database", "migrations", "sqlite", "002_create_users_table.sql")
-	destination := filepath.Join(dataDir, "migrations", "sqlite", filepath.Base(source))
-
-	migration, err := os.ReadFile(source)
-	if err != nil {
-		t.Fatalf("read user migration: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-		t.Fatalf("create temporary migration directory: %v", err)
-	}
-	if err := os.WriteFile(destination, migration, 0o600); err != nil {
-		t.Fatalf("write temporary user migration: %v", err)
-	}
+	copyE2EMigration(t, dataDir, "001_create_departments_table.sql")
+	copyE2EMigration(t, dataDir, "002_create_users_table.sql")
 }

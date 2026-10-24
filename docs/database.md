@@ -83,11 +83,27 @@ export GOREST_DB_USERNAME=gorest_app
 export GOREST_DB_PASSWORD='<local-development-password>'
 ```
 
-The current GOREST database configuration does not expose ScyllaDB TLS options. Configure TLS at a supported driver/network layer before using a remote ScyllaDB service.
+The current GOREST database configuration does not expose ScyllaDB TLS options through `GOREST_DB_TLS` or the other `GOREST_DB_*` variables. For a remote ScyllaDB service, configure TLS through a driver/network layer supported by your deployment, or use a trusted encrypted network. In production, GOREST warns that this database setting does not enable ScyllaDB transport encryption; the warning does not prevent startup.
 
 The default ports shown above are common service defaults; use the actual port and endpoint from your environment. MySQL, PostgreSQL, SQL Server, and Oracle expect a database/schema or service name; MongoDB expects a database name; ScyllaDB expects an existing keyspace. Migration and seeder files are driver-specific. Review them before enabling the local `true/true` example settings against a database with existing data.
 
-For production, set `APP_ENV=production` and inject `GOREST_DB_DRIVER`, `GOREST_DB_HOST`, `GOREST_DB_NAME`, `GOREST_DB_USERNAME`, `GOREST_DB_PASSWORD`, and `GOREST_DB_TLS` explicitly for server databases. For SQLite, set `GOREST_DB_DRIVER=sqlite` and an explicit persistent `GOREST_DB_DIRECTORY`. Set `GOREST_DB_MIGRATION=false` and `GOREST_DB_SEEDER=false`; these are production defaults, and startup fails if either is enabled. Use a secret manager or protected deployment environment for passwords. The application does not load `.env` files.
+For production, set `APP_ENV=production` and inject the database connection fields. The starter requires `GOREST_DB_TLS` to be explicitly set for MySQL, PostgreSQL, Oracle, SQL Server, and MongoDB, but it does **not** require that the selected mode enables encryption: for example, `disable` is accepted where that is a supported driver mode. ScyllaDB does not use this setting, and SQLite has no network transport to encrypt. This explicit setting requirement makes the selected behavior visible; it is not a universal TLS enforcement policy. Review the table below, GOREST's startup warning, and your own network/security policy before choosing a mode. For SQLite, set `GOREST_DB_DRIVER=sqlite` and an explicit persistent `GOREST_DB_DIRECTORY`. Set `GOREST_DB_MIGRATION=false` and `GOREST_DB_SEEDER=false`; these are production defaults, and startup fails if either is enabled. Use a secret manager or protected deployment environment for passwords. The application does not load `.env` files.
+
+### Production transport encryption by driver
+
+The starter provides connection settings and GOREST emits a warning in production when transport encryption is disabled or cannot be confirmed from the configuration. That warning is informational: it does not block startup and does not configure TLS for you. No single TLS setting works for every driver. Choose a mode compatible with your database and deployment; if a client, server, or network path cannot use TLS, decide whether a separately protected network meets your policy. A private IP address or firewall alone does not encrypt traffic.
+
+| Driver | TLS behavior available through this starter | Production considerations |
+| :-- | :-- | :-- |
+| SQLite | Not applicable; the database is a local file, not a network connection. | Protect the file, its directory, and backups with host/storage access controls. |
+| MySQL | `GOREST_DB_TLS=true` uses the driver's system certificate roots. GOREST passes the TLS option only when `GOREST_DB_SSL_CA_PATH` is non-empty; this path is a switch and is not loaded as a custom CA. | The default `disable` mode is accepted but triggers a warning. For a custom CA or client certificate, the Go MySQL driver needs a registered TLS profile; this starter does not expose profile registration as an environment setting. |
+| PostgreSQL | `GOREST_DB_TLS` maps to `sslmode`: `disable`, `require`, `verify-ca`, or `verify-full`. CA, client certificate, and key paths use the corresponding `GOREST_DB_SSL_*_PATH` settings. | `require` encrypts without verifying the server identity; `verify-ca` checks the CA chain but not the hostname. `verify-full` with a trusted CA provides certificate and hostname verification. `allow` and `prefer` can fall back to plaintext. |
+| Oracle | `enable` selects TCPS and uses `GOREST_DB_SSL_CA_PATH` as the Oracle wallet/configuration directory; `disable` uses TCP. | TCPS needs a correctly configured wallet and compatible Oracle service. `GOREST_DB_LIB_DIR` selects the Instant Client location when it is not on the system library path. |
+| SQL Server | `GOREST_DB_TLS` maps to the driver's `encrypt` setting (for example, `mandatory` or `strict`). The starter keeps `TrustServerCertificate=false`. | Use a server certificate trusted by the client. This starter does not expose `TrustServerCertificate` as an environment override. |
+| MongoDB | `GOREST_DB_TLS=true` enables TLS; `false` disables it. CA and client certificate/key PEM paths can be supplied through `GOREST_DB_SSL_CA_PATH` and `GOREST_DB_SSL_CERT_PATH`. | Confirm that the server certificate is trusted and that the configured server topology supports the selected TLS setup. |
+| ScyllaDB | `GOREST_DB_TLS` and the starter's other database TLS environment variables do not configure ScyllaDB TLS. | GOREST warns in production that transport encryption is not configured by this field. Configure TLS using ScyllaDB driver options outside this starter, or protect the path with a trusted encrypted network. |
+
+The warning is a useful signal, not a security guarantee: it cannot assess every proxy, tunnel, certificate deployment, or network control. Conversely, the absence of a warning does not certify the entire deployment. The application owner chooses and verifies the policy appropriate to the service and environment.
 
 The examples use GOREST's driver names: `mysql`, `postgres`, `oracle`, `sqlserver`, `mongo`, and `scylla`. Review the selected driver's migration and seeder files, and adapt native queries because SQL syntax, constraints, and transaction support differ. See the [GOREST v1.0.2 documentation](https://github.com/elsyahtech/gorest/tree/v1.0.2/docs) for framework-level details.
 
@@ -103,7 +119,7 @@ app/database/
 
 Migrations define the `departments`, `users`, and `orders` tables or collections. Seeders provide sample data for those resources. The PostgreSQL examples include departments with IDs `dept-01` through `dept-05`, sample users, and sample orders. Check the files for your selected driver before relying on specific IDs or data.
 
-The maintainer reports manually exercising all seven database integrations successfully. Separately, the `test/drivers` integration checks have automated migration, seeder, CRUD, and applicable transaction verification for all seven drivers. Server-driver checks require the corresponding service and driver-specific connection settings. The HTTP E2E suite primarily uses SQLite, with opt-in native MongoDB and ScyllaDB route tests. See the [driver verification matrix](./testing.md#driver-verification-matrix) for the per-operation results and limitations.
+The maintainer reports manually exercising all seven database integrations successfully. The automated `make test-e2e` runner provisions disposable services and runs migration, seeder, CRUD, applicable transaction, lifecycle, concurrency, and native-query route scenarios for the supported drivers. See the [driver verification matrix](./testing.md#driver-verification-matrix) for scenario applicability and recorded evidence.
 
 ## Paths and startup settings
 
@@ -113,7 +129,7 @@ The maintainer reports manually exercising all seven database integrations succe
 - `Migration` and `Seeder` are enabled so the matching SQLite files run when the application starts. Bare GOREST `ConfigDefault` leaves migrations and seeders disabled.
 - The SQLite example uses a single connection in its pool so simultaneous HTTP writes queue against SQLite's single-writer model. Server database drivers inherit GOREST's connection-pool defaults.
 
-When selecting a server driver, configure its host, port, username, password, database/service name, TLS, and any certificate or wallet paths as required by that driver. GOREST's defaults for timeouts and connection pool limits remain in effect unless you override them.
+When selecting a server driver, configure its host, port, username, password, database/service name, and any driver-supported TLS mode and certificate or wallet paths. GOREST's defaults for timeouts and connection pool limits remain in effect unless you override them. See [Production transport encryption by driver](#production-transport-encryption-by-driver) for what the starter does and does not configure.
 
 Directory paths are relative to the process working directory. Run the application from the repository root as described in [Getting started](./getting-started.md), or adjust the paths if your deployment layout is different.
 
@@ -133,7 +149,7 @@ Check the migration files for your selected driver before assuming that constrai
 
 ## Native queries and transactions
 
-The native SQL user routes use PostgreSQL syntax and `$1` placeholders. Adapt the query and placeholders before using a different SQL driver. Use the MongoDB routes only with MongoDB, and the Scylla routes only with ScyllaDB.
+The native SQL user routes select parameter markers for the configured SQL driver and are tested against SQLite, PostgreSQL, MySQL, Oracle, and SQL Server. SQL syntax and behavior may still vary between drivers. Use the MongoDB routes only with MongoDB, and the Scylla routes only with ScyllaDB.
 
 Some ORM operations use `BeginTx`, `Commit`, and `Rollback`. In these examples, GOREST transaction calls are no-ops for MongoDB and ScyllaDB. Do not assume that writes using those drivers are atomic transactions.
 
