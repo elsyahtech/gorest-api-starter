@@ -74,3 +74,6 @@ The automated database testing supports macOS and Linux. Windows is not currentl
 See the [testing and E2E guide](./docs/testing.md) for environment variables, coverage details, and test limitations. A passing test or build does not establish that every example works with every supported database driver.
 
 `make push` runs Gitleaks against the current working tree and Git history before sanitizing or staging. It then asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming. The sanitizer is a narrow helper; Gitleaks is the repository and history scanner.
+
+## Partner
+Thanks a lot bro.
