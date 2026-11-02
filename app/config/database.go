@@ -1,9 +1,12 @@
 package config
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest/database"
@@ -14,16 +17,68 @@ import (
 func Database() database.Config {
 	cfg := database.ConfigDefault
 	cfg.DatabaseDirectory = "./app/database"
-	// SQLite permits concurrent readers but only one writer at a time. Keep the
-	// local starter pool single-connection so concurrent HTTP writes queue rather
-	// than surfacing SQLITE_BUSY as an application error.
+	// SQLite permits concurrent readers but only one writer at a time. Keep one
+	// connection so writes queue and connection-local foreign-key enforcement
+	// remains enabled instead of surfacing SQLITE_BUSY or accepting invalid rows.
 	// See https://github.com/elsyahtech/gorest-api-starter/blob/main/docs/configuration.md
 	cfg.MaxOpenConnections = 1
 	cfg.MaxIdleConnections = 1
+	cfg.ConnectionMaxLifetime = 0
 	cfg.Migration = true
 	cfg.Seeder = true
 
 	return cfg
+}
+
+func EnableSQLiteForeignKeys(app *gorest.App) error {
+	if app == nil || app.Database() == nil {
+		return fmt.Errorf("enable SQLite foreign keys: database is not initialized")
+	}
+
+	ctx, cancel := app.NewContext(5 * time.Second)
+	defer cancel()
+
+	_, message, status, err := app.Database().ExecSQL(ctx, "PRAGMA foreign_keys = ON")
+	if err != nil {
+		return fmt.Errorf("enable SQLite foreign keys (HTTP %d, %s): %w", status, message, err)
+	}
+
+	rows, message, status, err := app.Database().QuerySQL(ctx, "PRAGMA foreign_keys")
+	if err != nil {
+		return fmt.Errorf("verify SQLite foreign keys (HTTP %d, %s): %w", status, message, err)
+	}
+	enabled, err := readSQLiteForeignKeySetting(rows)
+	if err != nil {
+		return err
+	}
+	if enabled != 1 {
+		return fmt.Errorf("verify SQLite foreign keys: pragma value = %d, want 1", enabled)
+	}
+
+	return nil
+}
+
+func readSQLiteForeignKeySetting(rows *sql.Rows) (enabled int, resultErr error) {
+	defer func() {
+		if err := rows.Close(); err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("close SQLite foreign-key setting rows: %w", err))
+		}
+	}()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return 0, fmt.Errorf("iterate SQLite foreign-key setting: %w", err)
+		}
+		return 0, fmt.Errorf("verify SQLite foreign keys: pragma returned no rows")
+	}
+	if err := rows.Scan(&enabled); err != nil {
+		return 0, fmt.Errorf("read SQLite foreign-key setting: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate SQLite foreign-key setting: %w", err)
+	}
+
+	return enabled, nil
 }
 
 // LoadDatabase applies environment overrides and rejects unsafe production
@@ -66,17 +121,20 @@ func LoadDatabase() (database.Config, error) {
 		}
 	}
 
+	var err error
+
 	cfg.Name = envString("GOREST_DB_NAME", cfg.Name)
 	cfg.Username = envString("GOREST_DB_USERNAME", cfg.Username)
 	cfg.Password = envSecret("GOREST_DB_PASSWORD", cfg.Password)
 	cfg.TLS = envString("GOREST_DB_TLS", cfg.TLS)
+	if cfg.AllowInsecureProduction, err = envBool("GOREST_DB_ALLOW_INSECURE_PRODUCTION", cfg.AllowInsecureProduction); err != nil {
+		return database.Config{}, err
+	}
 	cfg.LibDir = envString("GOREST_DB_LIB_DIR", cfg.LibDir)
 	cfg.SSLCAPath = envString("GOREST_DB_SSL_CA_PATH", cfg.SSLCAPath)
 	cfg.SSLCertPath = envString("GOREST_DB_SSL_CERT_PATH", cfg.SSLCertPath)
 	cfg.SSLKeyPath = envString("GOREST_DB_SSL_KEY_PATH", cfg.SSLKeyPath)
 	cfg.DatabaseDirectory = envString("GOREST_DB_DIRECTORY", cfg.DatabaseDirectory)
-
-	var err error
 
 	if cfg.Migration, err = envBool("GOREST_DB_MIGRATION", cfg.Migration); err != nil {
 		return database.Config{}, err
@@ -90,6 +148,10 @@ func LoadDatabase() (database.Config, error) {
 		if err := validateProductionDatabase(cfg); err != nil {
 			return database.Config{}, err
 		}
+	}
+
+	if cfg.AllowInsecureProduction && production {
+		return database.Config{}, fmt.Errorf("GOREST_DB_ALLOW_INSECURE_PRODUCTION must be false in production")
 	}
 
 	return cfg, nil

@@ -12,7 +12,7 @@ GOREST's framework documentation covers the framework APIs. This starter complem
 - Database migrations, seeders, request/response DTOs, and application startup.
 - Tests and documentation that describe the examples' behavior and driver-specific limits.
 
-Treat the structure and naming conventions in this guide as a recommended starting standard for applications built with GOREST. They are conventions demonstrated by this starter, not requirements imposed by the framework. Use the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) for framework APIs and guarantees; use this repository's guides for the behavior implemented by this application. The `/examples` routes are learning examples and do not provide authentication or authorization.
+Treat the structure and naming conventions in this guide as a recommended starting standard for applications built with GOREST. They are conventions demonstrated by this starter, not requirements imposed by the framework. Use the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) for framework APIs and guarantees; use this repository's guides for the behavior implemented by this application. Most `/examples` routes are unauthenticated. The login route issues an access cookie, and the `GET /examples/orm-queries/users/with-authentication` demonstration requires it; this does not add authorization or protect the other example routes.
 
 ## End-to-end lifecycle
 

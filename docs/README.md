@@ -1,6 +1,6 @@
 # Gorest API Starter Documentation
 
-This documentation is the application-specific guide for developers evaluating or adapting the starter. Follow it in order for a guided introduction, or use the individual references as needed. It describes the code and examples in this repository; it does not replace the [GOREST v1.0.2 framework documentation](https://github.com/elsyahtech/gorest/tree/v1.0.2/docs).
+This documentation is the application-specific guide for developers adopting or adapting the starter as their application foundation. It explains how this repository wires GOREST, and what the included examples do. It does not replace the framework reference: use the [GOREST v1.1.15 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.15/docs) for framework APIs and guarantees.
 
 ## Learning path
 
@@ -16,7 +16,7 @@ This documentation is the application-specific guide for developers evaluating o
 ## Scope
 
 - These guides describe the configuration and examples in this repository. For framework APIs, ORM behavior, middleware, and helpers, use the GOREST documentation.
-- Routes under `/examples` are demonstrations, not a production API contract. They have no authentication or authorization.
+- Routes under `/examples` are demonstrations, not a production API contract. Most are unauthenticated; `POST /examples/login` issues an access cookie and only `GET /examples/orm-queries/users/with-authentication` requires it. This is not production-ready authorization or access control.
 - The checked-in database configuration uses SQLite and enables this starter's migrations and seeders, so the examples can run locally without a database server or credentials. See the [database guide](./database.md) before switching drivers; review startup and secret handling before deployment.
 - Database examples are driver-specific. A migration or query example for one database is not a guarantee of equivalent behavior on another driver.
 - Keep this documentation in sync when changing routes, request/response DTOs, configuration, migrations, seeders, or application behavior.

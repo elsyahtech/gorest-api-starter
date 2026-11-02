@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,13 +18,17 @@ import (
 	"time"
 
 	"github.com/elsyahtech/gorest"
+	appconfig "github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	"github.com/elsyahtech/gorest-api-starter/app/handler"
 	"github.com/elsyahtech/gorest-api-starter/app/library"
 	"github.com/elsyahtech/gorest-api-starter/app/model"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
+	"github.com/elsyahtech/gorest-api-starter/test/mysqltls"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	gorestlog "github.com/elsyahtech/gorest/log"
+	"github.com/elsyahtech/gorest/monitoring"
 	"github.com/elsyahtech/gorest/server"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
@@ -53,6 +58,9 @@ func TestDatabaseDriverIntegration(t *testing.T) {
 
 	verifySeedData(t, app)
 	verifyCRUD(t, app, driver)
+	if driver == database.SQLITE {
+		verifySQLiteForeignKeyEnforcement(t, app)
+	}
 	if driver == database.SQLITE || driver == database.POSTGRES || driver == database.MYSQL || driver == database.ORACLE || driver == database.SQLSERVER {
 		verifyNativeSQLRoutes(t, app, driver)
 	}
@@ -66,6 +74,132 @@ func TestDatabaseDriverIntegration(t *testing.T) {
 	verifyConcurrentRequests(t, app, driver)
 	verifyConnectionStartupFailure(t, driver)
 	verifyMigrationStartupFailure(t, config, driver)
+}
+
+func TestMySQLStorageEndpointIntegration(t *testing.T) {
+	driver := strings.ToLower(strings.TrimSpace(os.Getenv("GOREST_DRIVER_INTEGRATION")))
+	if driver != database.MYSQL {
+		t.Skip("set GOREST_DRIVER_INTEGRATION=mysql to run the MySQL storage endpoint integration test")
+	}
+
+	config, _ := integrationDatabaseConfig(t, driver)
+	verifyMySQLStorageEndpoint(t, config)
+}
+
+func verifyMySQLStorageEndpoint(t *testing.T, config database.Config) {
+	t.Helper()
+
+	config = database.Run(config)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+	defer cancel()
+	storageDatabase, message, err := database.New(ctx, &config, "UTC")
+	if err != nil {
+		t.Fatalf("open MySQL storage endpoint database connection (%s): %v", message, err)
+	}
+	t.Cleanup(func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer closeCancel()
+		if message, _, err := storageDatabase.Close(closeCtx, &config); err != nil {
+			t.Errorf("close MySQL storage endpoint database connection (%s): %v", message, err)
+		}
+	})
+
+	httpServer, _, err := server.New(nil)
+	if err != nil {
+		t.Fatalf("create HTTP server for MySQL storage endpoint: %v", err)
+	}
+	monitoring.Register(httpServer.Group("/gorest"), config, storageDatabase)
+
+	beforeBytes := requestMySQLStorageMetric(t, httpServer)
+
+	tableName := fmt.Sprintf("gorest_storage_metric_%d", time.Now().UnixNano())
+	if _, err := storageDatabase.SQL.ExecContext(ctx, fmt.Sprintf(
+		"CREATE TABLE `%s` (id INT NOT NULL PRIMARY KEY, payload VARCHAR(4096) NOT NULL) ENGINE=InnoDB",
+		tableName,
+	)); err != nil {
+		t.Fatalf("create temporary MySQL storage metric table: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		if _, err := storageDatabase.SQL.ExecContext(cleanupCtx, fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tableName)); err != nil {
+			t.Errorf("drop temporary MySQL storage metric table: %v", err)
+		}
+	})
+
+	tx, err := storageDatabase.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin MySQL storage metric inserts: %v", err)
+	}
+	payload := strings.Repeat("x", 4000)
+	for firstID := 1; firstID <= 500; firstID += 50 {
+		const batchSize = 50
+		values := strings.TrimSuffix(strings.Repeat("(?, ?),", batchSize), ",")
+		args := make([]any, 0, batchSize*2)
+		for id := firstID; id < firstID+batchSize; id++ {
+			args = append(args, id, payload)
+		}
+		if _, err := tx.ExecContext(ctx,
+			fmt.Sprintf("INSERT INTO `%s` (id, payload) VALUES %s", tableName, values),
+			args...,
+		); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("insert MySQL storage metric rows %d-%d of 500: %v", firstID, firstID+batchSize-1, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit MySQL storage metric inserts: %v", err)
+	}
+
+	afterBytes := requestMySQLStorageMetric(t, httpServer)
+	t.Logf("mysql storage estimate before 500 rows: %d bytes; after: %d bytes; delta: %d bytes",
+		beforeBytes, afterBytes, afterBytes-beforeBytes)
+}
+
+func requestMySQLStorageMetric(t *testing.T, httpServer *server.Server) int64 {
+	t.Helper()
+
+	response, err := httpServer.SRV.Test(httptest.NewRequest(http.MethodGet, "/gorest/storage", nil))
+	if err != nil {
+		t.Fatalf("request MySQL storage endpoint: %v", err)
+	}
+	body, readErr := io.ReadAll(response.Body)
+	closeErr := response.Body.Close()
+	if readErr != nil {
+		t.Fatalf("read MySQL storage endpoint response: %v", readErr)
+	}
+	if closeErr != nil {
+		t.Fatalf("close MySQL storage endpoint response: %v", closeErr)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("MySQL storage endpoint status = %d, want %d; response: %s",
+			response.StatusCode, http.StatusOK, body)
+	}
+
+	var result struct {
+		Status   string `json:"status"`
+		Database struct {
+			Driver      string `json:"driver"`
+			Scope       string `json:"scope"`
+			Measurement string `json:"measurement"`
+			UsedBytes   int64  `json:"used_bytes"`
+		} `json:"database"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatalf("decode MySQL storage endpoint response: %v; response: %s", err, body)
+	}
+	if result.Status != "available" {
+		t.Fatalf("MySQL storage endpoint status field = %q, want available; response: %s", result.Status, body)
+	}
+	if result.Database.Driver != database.MYSQL ||
+		result.Database.Scope != "configured_database" ||
+		result.Database.Measurement != "table_data_and_index_size" ||
+		result.Database.UsedBytes < 0 {
+		t.Fatalf("unexpected MySQL storage metric: %+v", result.Database)
+	}
+	t.Logf("mysql storage endpoint passed; database estimate=%d bytes (%s)",
+		result.Database.UsedBytes, result.Database.Measurement)
+	return result.Database.UsedBytes
 }
 
 func verifyNativeSQLRoutes(t *testing.T, app *gorest.App, driver string) {
@@ -162,7 +296,7 @@ func verifyConnectionStartupFailure(t *testing.T, driver string) {
 	if err == nil {
 		t.Fatalf("%s application startup succeeded with an unavailable database; output: %s", driver, output)
 	}
-	if !strings.Contains(string(output), "failed initializing database") {
+	if !strings.Contains(string(output), "failed to run database") {
 		t.Fatalf("%s startup exited for an unexpected reason; output: %s", driver, output)
 	}
 	if strings.Contains(string(output), "database initialized successfully") {
@@ -180,7 +314,7 @@ func startWithUnavailableDatabase(t *testing.T, driver string) {
 	config.Port = os.Getenv("GOREST_DRIVER_FAILURE_PORT")
 	logConfig := gorestlog.ConfigDefault
 	logConfig.LogDir = filepath.Join(t.TempDir(), "logs")
-	app := gorest.New(gorest.Config{AppName: "gorest-api-starter-driver-startup-failure", Environment: "Test", Timezone: "UTC"})
+	app := gorest.New(gorest.Config{AppName: "gorest-api-starter-driver-startup-failure", Environment: gorest.Testing, Timezone: "UTC"})
 	app.Use(gorestlog.Run(logConfig), database.Run(config))
 	t.Fatal("application startup unexpectedly succeeded with an unavailable database")
 }
@@ -227,9 +361,10 @@ func integrationDatabaseConfig(t *testing.T, driver string) (database.Config, st
 	switch driver {
 	case database.SQLITE:
 		// SQLite has a single-writer model; serialize DB work in the test pool
-		// while keeping all HTTP requests concurrent.
+		// while keeping all HTTP requests concurrent and foreign keys enabled.
 		config.MaxOpenConnections = 1
 		config.MaxIdleConnections = 1
+		config.ConnectionMaxLifetime = 0
 		config.Name = filepath.Join(t.TempDir(), "gorest-driver-integration.sqlite")
 		config.DatabaseDirectory = repositoryDatabaseDir
 	case database.POSTGRES:
@@ -243,7 +378,19 @@ func integrationDatabaseConfig(t *testing.T, driver string) (database.Config, st
 		config.Username = envOr("GOREST_DRIVER_USERNAME", "root")
 		config.Password = envOr("GOREST_DRIVER_PASSWORD", "GorestTest!Pass2026")
 		config.Name = databaseName
-		config.TLS = "disable"
+		config.TLS = envOr("GOREST_DRIVER_TLS", "disable")
+		config.SSLCAPath = os.Getenv("GOREST_DRIVER_SSL_CA_PATH")
+		if config.TLS != "disable" && config.TLS != "true" {
+			if err := mysqltls.RegisterProfile(
+				config.TLS,
+				envOr("GOREST_DRIVER_TLS_SERVER_NAME", config.Host),
+				config.SSLCAPath,
+				os.Getenv("GOREST_DRIVER_SSL_CERT_PATH"),
+				os.Getenv("GOREST_DRIVER_SSL_KEY_PATH"),
+			); err != nil {
+				t.Fatalf("configure MySQL TLS: %v", err)
+			}
+		}
 	case database.ORACLE:
 		config.Host = envOr("GOREST_DRIVER_HOST", "127.0.0.1")
 		config.Port = envOr("GOREST_DRIVER_PORT", "1521")
@@ -284,13 +431,19 @@ func newIntegrationApp(t *testing.T, config database.Config) *gorest.App {
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-driver-integration",
 		Version:     "test",
-		Environment: "Test",
+		Environment: gorest.Testing,
 		Timezone:    "UTC",
 	})
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(config),
+		filter.Run(driverIntegrationFilterConfig()),
 	)
+	if config.Driver == database.SQLITE {
+		if err := appconfig.EnableSQLiteForeignKeys(app); err != nil {
+			t.Fatalf("enable SQLite foreign keys: %v", err)
+		}
+	}
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close %s integration app (%s): %v", config.Driver, message, err)
@@ -299,6 +452,15 @@ func newIntegrationApp(t *testing.T, config database.Config) *gorest.App {
 		}
 	})
 	return app
+}
+
+func driverIntegrationFilterConfig() filter.Config {
+	signatureKey := "gorest-api-starter-driver-integration-test-key"
+	config := filter.ConfigDefault
+	config.SignatureKey = &signatureKey
+	config.CookieSecure = false
+	config.LoggerConfig.DisableLogging = true
+	return config
 }
 
 func ensureSQLServerDatabase(t *testing.T, config database.Config, databaseName string) {
@@ -402,6 +564,64 @@ func verifyCRUD(t *testing.T, app *gorest.App, driver string) {
 		t.Fatalf("deleted %s user is still readable: %+v", driver, deleted)
 	}
 	t.Logf("%s ORM create/read/update/delete passed", driver)
+}
+
+func verifySQLiteForeignKeyEnforcement(t *testing.T, app *gorest.App) {
+	t.Helper()
+
+	const invalidOrderID = "sqlite-foreign-key-invalid-user"
+	invalidOrder := entity.Order{
+		ID:          invalidOrderID,
+		UserID:      "sqlite-user-does-not-exist",
+		OrderNumber: invalidOrderID,
+		Status:      "PENDING",
+		TotalAmount: 1,
+		IsActive:    true,
+		CreatedAt:   time.Now().UTC(),
+	}
+	query := app.Database().Table("orders").Create(&invalidOrder)
+	if query.Error == nil {
+		t.Fatal("SQLite accepted an order insert referencing a missing user; want foreign-key constraint failure")
+	}
+
+	var persisted entity.Order
+	query = app.Database().Table("orders").Where("id = ?", invalidOrderID).Find(&persisted)
+	if query.Error == nil {
+		t.Fatalf("SQLite persisted an order insert with a missing user: %+v", persisted)
+	}
+
+	var user entity.User
+	query = app.Database().Table("users").Find(&user)
+	if query.Error != nil {
+		t.Fatalf("read a seeded user for the SQLite foreign-key update check: %s: %v",
+			query.Message, query.Error)
+	}
+	validOrder := entity.Order{
+		ID:          "sqlite-foreign-key-update",
+		UserID:      user.ID,
+		OrderNumber: "sqlite-foreign-key-update",
+		Status:      "PENDING",
+		TotalAmount: 1,
+		IsActive:    true,
+		CreatedAt:   time.Now().UTC(),
+	}
+	query = app.Database().Table("orders").Create(&validOrder)
+	if query.Error != nil {
+		t.Fatalf("create SQLite order for foreign-key update check: %s: %v", query.Message, query.Error)
+	}
+	validUserID := validOrder.UserID
+	validOrder.UserID = "sqlite-user-does-not-exist"
+	query = app.Database().Table("orders").
+		Where("id = ?", validOrder.ID).Update(&validOrder)
+	if query.Error == nil {
+		t.Fatal("SQLite accepted an order update referencing a missing user; want foreign-key constraint failure")
+	}
+	query = app.Database().Table("orders").Where("id = ?", validOrder.ID).Find(&persisted)
+	if query.Error != nil || persisted.UserID != validUserID {
+		t.Fatalf("SQLite order after rejected foreign-key update = %+v, query error = %v; want user %q",
+			persisted, query.Error, validUserID)
+	}
+	t.Log("SQLite foreign-key constraints rejected invalid order inserts and updates")
 }
 
 func verifyTransactionRollback(t *testing.T, app *gorest.App, driver string) {
@@ -719,9 +939,9 @@ func newUserIntegrationServer(t *testing.T, app *gorest.App) *server.Server {
 		t.Fatalf("create integration HTTP server: %v", err)
 	}
 	userModel := model.NewUserModel(app)
-	userLibrary := library.NewUserLibrary(userModel)
+	userLibrary := library.NewUserLibrary(app, userModel)
 	userHandler := handler.NewUserHandler(app, userLibrary)
-	router.RegisterUserRoutes(testServer.Group("/examples"), userHandler)
+	router.RegisterUserRoutes(app, testServer.Group("/examples"), userHandler)
 	return testServer
 }
 

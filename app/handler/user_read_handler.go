@@ -504,3 +504,28 @@ func (handler *UserHandler) GetUserFromRedisByID(ctx *gorest.Context) error {
 
 	return response.SendJSON(ctx, response, nil)
 }
+
+func (handler *UserHandler) GetUsersUsingAuthentication(ctx *gorest.Context) error {
+	response := handler.JSON.NewResponse(gorest.Map{
+		"developer": "Elmansyah",
+		"contact":   "https://www.linkedin.com/in/elmansyah",
+		"version":   "v1",
+	})
+
+	data, message, httpCode, err := handler.UserLibrary.GetUsers()
+	if err != nil {
+		response.WithMessage(message, err, httpCode)
+
+		handler.App.Log(gorest.Map{
+			"error": err,
+		}).Error(message)
+
+		return response.SendJSON(ctx, response, err)
+	}
+
+	response.Data = resview.BuildUserResponseArray(data)
+
+	response.WithMessage(message, nil, httpCode)
+
+	return response.SendJSON(ctx, response, nil)
+}

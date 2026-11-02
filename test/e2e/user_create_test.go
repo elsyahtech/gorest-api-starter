@@ -14,6 +14,7 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/model"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	gorestlog "github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/server"
 )
@@ -399,7 +400,7 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	t.Helper()
 
 	dataDir := t.TempDir()
-	copyUserMigration(t, dataDir)
+	copyUserMigrations(t, dataDir)
 
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -420,13 +421,15 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-user-e2e",
 		Version:     "test",
-		Environment: "Test",
+		Environment: gorest.Testing,
 		Timezone:    "UTC",
 	})
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(databaseConfig),
+		filter.Run(e2eFilterConfig()),
 	)
+	enableSQLiteForeignKeys(t, app, databaseConfig.Driver)
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close test application: %s: %v", message, err)
@@ -436,7 +439,7 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 		t.Fatalf("run %s user migration: %v", databaseConfig.Driver, err)
 	}
 	if databaseConfig.Driver != database.SQLITE {
-		resetSQLTestTables(t, app)
+		resetSQLTestTables(t, app, "orders", "users", "departments")
 	}
 
 	testServer, _, err := server.New(&server.ConfigDefault)
@@ -444,15 +447,20 @@ func newUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 		t.Fatalf("create test HTTP server: %v", err)
 	}
 	userModel := model.NewUserModel(app)
-	userLibrary := library.NewUserLibrary(userModel)
+	userLibrary := library.NewUserLibrary(app, userModel)
 	userHandler := handler.NewUserHandler(app, userLibrary)
-	router.RegisterUserRoutes(testServer.Group("/examples"), userHandler)
+	router.RegisterUserRoutes(app, testServer.Group("/examples"), userHandler)
 
 	return testServer, app
 }
 
-func copyUserMigration(t *testing.T, dataDir string) {
+func copyUserMigrations(t *testing.T, dataDir string) {
 	t.Helper()
-	copyE2EMigration(t, dataDir, "001_create_departments_table.sql")
-	copyE2EMigration(t, dataDir, "002_create_users_table.sql")
+	for _, name := range []string{
+		"001_create_departments_table.sql",
+		"002_create_users_table.sql",
+		"003_create_orders_table.sql",
+	} {
+		copyE2EMigration(t, dataDir, name)
+	}
 }

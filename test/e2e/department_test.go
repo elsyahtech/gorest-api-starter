@@ -48,13 +48,14 @@ func newDepartmentTestServer(t *testing.T) *server.Server {
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-e2e",
 		Version:     "test",
-		Environment: "Test",
+		Environment: gorest.Testing,
 		Timezone:    "UTC",
 	})
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(databaseConfig),
 	)
+	enableSQLiteForeignKeys(t, app, databaseConfig.Driver)
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close test application: %s: %v", message, err)
@@ -65,7 +66,7 @@ func newDepartmentTestServer(t *testing.T) *server.Server {
 		t.Fatalf("run %s department migration: %v", databaseConfig.Driver, err)
 	}
 	if databaseConfig.Driver != database.SQLITE {
-		resetSQLTestTables(t, app)
+		resetSQLTestTables(t, app, "departments")
 	}
 
 	testServer, _, err := server.New(&server.ConfigDefault)

@@ -89,7 +89,8 @@ run_integration_test() {
 run_sqlite_test() {
 	run_integration_test sqlite
 	printf '\n=== Running SQLite route and lifecycle scenarios (excluding MongoDB and ScyllaDB tests) ===\n'
-	env -u GOREST_MONGO_E2E -u GOREST_SCYLLA_E2E go test -v -count=1 -timeout=10m \
+	env -u GOREST_MONGO_E2E -u GOREST_SCYLLA_E2E GOREST_E2E_DRIVER=sqlite \
+		go test -v -count=1 -timeout=10m \
 		-skip 'Native(CQL|MongoQuery)E2E' ./test/e2e
 }
 

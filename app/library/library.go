@@ -1,9 +1,13 @@
 package library
 
-import "github.com/elsyahtech/gorest-api-starter/app/model"
+import (
+	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest-api-starter/app/model"
+)
 
 // UserLibrary contains user-related application logic.
 type UserLibrary struct {
+	App       *gorest.App
 	UserModel *model.UserModel
 }
 
@@ -18,8 +22,9 @@ type OrderLibrary struct {
 }
 
 // NewUserLibrary creates a user library backed by the given model.
-func NewUserLibrary(userModel *model.UserModel) *UserLibrary {
+func NewUserLibrary(app *gorest.App, userModel *model.UserModel) *UserLibrary {
 	return &UserLibrary{
+		App:       app,
 		UserModel: userModel,
 	}
 }

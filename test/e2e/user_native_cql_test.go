@@ -17,6 +17,7 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/model"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	gorestlog "github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/server"
 )
@@ -212,9 +213,9 @@ func newScyllaUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 		t.Fatalf("create test HTTP server: %v", err)
 	}
 	userModel := model.NewUserModel(app)
-	userLibrary := library.NewUserLibrary(userModel)
+	userLibrary := library.NewUserLibrary(app, userModel)
 	userHandler := handler.NewUserHandler(app, userLibrary)
-	router.RegisterUserRoutes(testServer.Group("/examples"), userHandler)
+	router.RegisterUserRoutes(app, testServer.Group("/examples"), userHandler)
 
 	return testServer, app
 }
@@ -277,6 +278,7 @@ func newScyllaTestApp(
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(databaseConfig),
+		filter.Run(e2eFilterConfig()),
 	)
 	return app
 }

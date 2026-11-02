@@ -9,7 +9,9 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	"github.com/elsyahtech/gorest/log"
+	"github.com/elsyahtech/gorest/monitoring"
 	"github.com/elsyahtech/gorest/redis"
 	"github.com/elsyahtech/gorest/server"
 )
@@ -30,6 +32,16 @@ func main() {
 		failConfiguration(err)
 	}
 
+	filterConfig, err := config.LoadFilters()
+	if err != nil {
+		failConfiguration(err)
+	}
+
+	monitoringConfig, err := config.LoadMonitoring()
+	if err != nil {
+		failConfiguration(err)
+	}
+
 	if config.Environment() == gorest.Production {
 		if err := requireProductionRedis(redisConfig); err != nil {
 			failConfiguration(err)
@@ -38,11 +50,12 @@ func main() {
 
 	// Initialize the application and its shared configuration.
 	app := gorest.New(gorest.Config{
-		AppName:     "gorest-api-starter",
-		Version:     "1.0.0",
-		Environment: config.Environment(),
-		Timezone:    "Asia/Jakarta",
-		Debug:       false,
+		AppName:         "gorest-api-starter",
+		Version:         "1.0.0",
+		Environment:     config.Environment(),
+		Timezone:        "Asia/Jakarta",
+		Debug:           false,
+		CheckForUpdates: gorest.EnableAutoUpdate,
 	})
 
 	// Register application services before registering routes.
@@ -50,8 +63,15 @@ func main() {
 		log.Run(config.Logger()),
 		redis.Run(redisConfig),
 		database.Run(databaseConfig),
+		filter.Run(filterConfig),
 		server.Run(serverConfig),
+		monitoring.Run(monitoringConfig),
 	)
+	if databaseConfig.Driver == database.SQLITE {
+		if err := config.EnableSQLiteForeignKeys(app); err != nil {
+			failConfiguration(err)
+		}
+	}
 
 	// Register the application's route modules.
 	app.RegisterServices([]gorest.RouterRegistrar{

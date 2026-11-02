@@ -14,13 +14,14 @@ import (
 // Static paths are registered before parameter paths such as /users/:id.
 func UserRouter(app *gorest.App) {
 	mdl := model.NewUserModel(app)
-	lib := library.NewUserLibrary(mdl)
+	lib := library.NewUserLibrary(app, mdl)
 	hndlr := handler.NewUserHandler(app, lib)
-	RegisterUserRoutes(app.Group("/examples"), hndlr)
+	RegisterUserRoutes(app, app.Group("/examples"), hndlr)
 }
 
 // RegisterUserRoutes registers user endpoints on a route group.
-func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
+func RegisterUserRoutes(app *gorest.App, group *server.Server, hndlr *handler.UserHandler) {
+	authentication := app.Filter().Authentication()
 	// Read users with ORM queries.
 	group.Get("/orm-queries/users", hndlr.GetUsers)
 	group.Get("/orm-queries/users/select-all", hndlr.GetUsersWithAllColumns)
@@ -33,6 +34,9 @@ func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
 	group.Get("/orm-queries/users/preload", hndlr.GetUsersWithPreloadedDepartment)
 	group.Get("/orm-queries/users/limit", hndlr.GetUsersByLimit)
 	group.Get("/orm-queries/users/pagination", hndlr.GetUsersByLimitOffset)
+
+	// Read users using authentication. This endpoint requires a valid authentication token to access.
+	group.Get("/orm-queries/users/with-authentication", authentication, hndlr.GetUsersUsingAuthentication)
 
 	// Read users with each native query API. The SQL route uses the configured SQL driver.
 	group.Get("/native-queries/users/sql", hndlr.GetUsersWithNativeSQL)
@@ -79,6 +83,9 @@ func RegisterUserRoutes(group *server.Server, hndlr *handler.UserHandler) {
 
 	// Create users with redis query APIs.
 	group.Post("/redis-queries/users", hndlr.CreateUserToRedis)
+
+	// User login endpoint. This endpoint is for demonstration purposes only and should be secured in production.
+	group.Post("/login", hndlr.Login)
 
 	// Update users. Register fixed paths before the /:id parameter route.
 	group.Put("/orm-queries/users/bulk", hndlr.UpdateUsersInBulk)

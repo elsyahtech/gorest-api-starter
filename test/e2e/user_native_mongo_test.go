@@ -17,6 +17,7 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/model"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	gorestlog "github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/server"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -164,6 +165,7 @@ func newMongoUserTestServer(t *testing.T) (*server.Server, *gorest.App, string) 
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(databaseConfig),
+		filter.Run(e2eFilterConfig()),
 	)
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
@@ -179,9 +181,9 @@ func newMongoUserTestServer(t *testing.T) (*server.Server, *gorest.App, string) 
 		t.Fatalf("create test HTTP server: %v", err)
 	}
 	userModel := model.NewUserModel(app)
-	userLibrary := library.NewUserLibrary(userModel)
+	userLibrary := library.NewUserLibrary(app, userModel)
 	userHandler := handler.NewUserHandler(app, userLibrary)
-	router.RegisterUserRoutes(testServer.Group("/examples"), userHandler)
+	router.RegisterUserRoutes(app, testServer.Group("/examples"), userHandler)
 
 	return testServer, app, databaseName
 }

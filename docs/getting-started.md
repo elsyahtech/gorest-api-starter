@@ -1,6 +1,6 @@
 # Getting started
 
-This guide gets the reference application running locally. The examples are not ready to be exposed to the internet.
+This guide gets the GOREST application starter running locally so you can evaluate it, build on its structure, or use it as the foundation for your own service. The included examples are not ready to be exposed to the internet.
 
 ## Requirements
 

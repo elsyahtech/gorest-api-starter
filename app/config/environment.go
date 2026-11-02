@@ -29,6 +29,19 @@ func envString(key, fallback string) string {
 	return fallback
 }
 
+func envStringSlice(key string, fallback []string) ([]string, error) {
+	if value, ok := os.LookupEnv(key); ok {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return []string{}, nil
+		}
+
+		return strings.Split(trimmed, ","), nil
+	}
+
+	return fallback, nil
+}
+
 func envSecret(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value

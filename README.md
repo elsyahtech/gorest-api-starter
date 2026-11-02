@@ -1,8 +1,8 @@
 # Gorest API Starter
 
-A Go REST API reference application built with [GOREST](https://github.com/elsyahtech/gorest). It demonstrates a layered application structure, CRUD endpoints, ORM and native database queries, transactions, migrations, seeders, and request/response DTOs.
+A ready-to-run application starter built with the [GOREST framework](https://github.com/elsyahtech/gorest). Use it to start an application with GOREST already wired, learn the framework through working examples, and adapt the structure and configuration to your own service. It includes layered CRUD routes, ORM and driver-specific native query examples, migrations, seeders, authentication examples, and tests.
 
-This repository is intended as a **learning and implementation reference**. Adapt its examples to your business requirements before using them in an internal or public production service.
+This repository supports adoption of GOREST by providing a complete, modifiable application around the framework. The starter documentation explains this repository's choices; for framework APIs and guarantees, use the matching [GOREST v1.1.15 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.15/docs). Adapt and secure the examples for your business requirements before exposing a service.
 
 ## Documentation
 
@@ -16,13 +16,13 @@ Start with the [documentation index](./docs/README.md). The guides are ordered a
 6. [Adding features](./docs/extending.md) — a step-by-step guide to extend the starter consistently.
 7. [Testing and E2E coverage](./docs/testing.md) — run the suite, generate coverage, and verify the seven database drivers.
 
-These guides describe this application, not every framework feature. For GOREST framework APIs and behavior, see the [GOREST v1.0.2 documentation](https://github.com/elsyahtech/gorest/tree/v1.0.2/docs).
+These guides show how this starter uses GOREST; they do not replace the framework reference. For GOREST framework APIs and behavior matching this starter's dependency, see the [GOREST v1.1.15 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.15/docs).
 
 For vulnerability reporting and the project's security policy, see [SECURITY.md](./SECURITY.md).
 
 ## Important: examples are not production-ready
 
-All routes are registered under `/examples` and have no authentication or authorization. Do not expose them to untrusted clients. Before adapting this starter for a business application, add access controls, review every example operation, and follow the [deployment checklist](./docs/configuration.md).
+Most routes under `/examples` are unauthenticated. `POST /examples/login` issues an access cookie, and only `GET /examples/orm-queries/users/with-authentication` requires that token; this demonstration does not provide authorization for the other routes or production-ready access control. Do not expose the examples to untrusted clients. Before adapting this starter for a business application, secure every route and follow the [deployment checklist](./docs/configuration.md).
 
 The checked-in configuration is for local examples only: it uses GOREST's SQLite default and enables both migrations and sample seeders (`Migration=true`, `Seeder=true`). Do not deploy these startup settings to production. Production application instances must not run the sample seeders or apply migrations automatically; use a controlled deployment migration step. See the [database guide](./docs/database.md) before selecting another driver or adapting the configuration for deployment.
 

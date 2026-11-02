@@ -11,11 +11,23 @@ import (
 	"time"
 
 	"github.com/elsyahtech/gorest"
+	appconfig "github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
+	"github.com/elsyahtech/gorest-api-starter/test/mysqltls"
 	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/filter"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
+
+func e2eFilterConfig() filter.Config {
+	signatureKey := "gorest-api-starter-e2e-signature-key"
+	config := filter.ConfigDefault
+	config.SignatureKey = &signatureKey
+	config.CookieSecure = false
+	config.LoggerConfig.DisableLogging = true
+	return config
+}
 
 func e2eDatabaseConfig(t *testing.T, dataDir, name string) database.Config {
 	t.Helper()
@@ -47,6 +59,7 @@ func e2eDatabaseConfig(t *testing.T, dataDir, name string) database.Config {
 		config.Name = name
 		config.MaxOpenConnections = 1
 		config.MaxIdleConnections = 1
+		config.ConnectionMaxLifetime = 0
 		config.DatabaseDirectory = dataDir
 		return config
 	}
@@ -57,7 +70,38 @@ func e2eDatabaseConfig(t *testing.T, dataDir, name string) database.Config {
 	if driver != database.MONGO && driver != database.SCYLLA {
 		config.TLS = "disable"
 	}
+	if driver == database.MYSQL {
+		if tlsMode := os.Getenv("GOREST_DRIVER_TLS"); tlsMode != "" {
+			config.TLS = tlsMode
+		}
+		config.SSLCAPath = os.Getenv("GOREST_DRIVER_SSL_CA_PATH")
+		if config.TLS != "disable" && config.TLS != "true" {
+			serverName := os.Getenv("GOREST_DRIVER_TLS_SERVER_NAME")
+			if serverName == "" {
+				serverName = config.Host
+			}
+			if err := mysqltls.RegisterProfile(
+				config.TLS,
+				serverName,
+				config.SSLCAPath,
+				os.Getenv("GOREST_DRIVER_SSL_CERT_PATH"),
+				os.Getenv("GOREST_DRIVER_SSL_KEY_PATH"),
+			); err != nil {
+				t.Fatalf("configure MySQL TLS: %v", err)
+			}
+		}
+	}
 	return config
+}
+
+func enableSQLiteForeignKeys(t *testing.T, app *gorest.App, driver string) {
+	t.Helper()
+	if database.NormalizeDatabaseDriver(driver) != database.SQLITE {
+		return
+	}
+	if err := appconfig.EnableSQLiteForeignKeys(app); err != nil {
+		t.Fatalf("enable SQLite foreign keys: %v", err)
+	}
 }
 
 func e2eMigrationDirectory() string {
@@ -81,7 +125,7 @@ func e2eSQLPlaceholder(index int) string {
 	}
 }
 
-func resetSQLTestTables(t *testing.T, app *gorest.App) {
+func resetSQLTestTables(t *testing.T, app *gorest.App, tables ...string) {
 	t.Helper()
 	ctx, cancel := app.NewContext(30 * time.Second)
 	defer cancel()
@@ -89,7 +133,7 @@ func resetSQLTestTables(t *testing.T, app *gorest.App) {
 	switch os.Getenv("GOREST_E2E_DRIVER") {
 	case database.MONGO:
 		_, _, err := app.Database().RawQueryMongo(ctx, func(ctx context.Context, client *mongo.Client) error {
-			for _, collectionName := range []string{"users", "departments", "orders"} {
+			for _, collectionName := range tables {
 				if _, err := client.Database(os.Getenv("GOREST_DRIVER_DATABASE")).
 					Collection(collectionName).DeleteMany(ctx, bson.D{}); err != nil {
 					return fmt.Errorf("clear collection %q: %w", collectionName, err)
@@ -102,7 +146,7 @@ func resetSQLTestTables(t *testing.T, app *gorest.App) {
 		}
 		return
 	case database.SCYLLA:
-		for _, table := range []string{"users", "departments", "orders"} {
+		for _, table := range tables {
 			if _, _, err := app.Database().ExecCQL(ctx, "TRUNCATE "+table); err != nil {
 				t.Fatalf("clear ScyllaDB E2E table %q: %v", table, err)
 			}
@@ -110,7 +154,7 @@ func resetSQLTestTables(t *testing.T, app *gorest.App) {
 		return
 	}
 
-	for _, table := range []string{"orders", "users", "departments"} {
+	for _, table := range tables {
 		if _, _, _, err := app.Database().ExecSQL(ctx, "DELETE FROM "+table); err != nil {
 			t.Fatalf("clear shared E2E table %q: %v", table, err)
 		}

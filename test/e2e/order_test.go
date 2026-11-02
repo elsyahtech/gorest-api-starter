@@ -47,13 +47,14 @@ func newOrderTestServerWithUsers(t *testing.T, userCount int) (*server.Server, [
 	app := gorest.New(gorest.Config{
 		AppName:     "gorest-api-starter-order-e2e",
 		Version:     "test",
-		Environment: "Test",
+		Environment: gorest.Testing,
 		Timezone:    "UTC",
 	})
 	app.Use(
 		gorestlog.Run(logConfig),
 		database.Run(databaseConfig),
 	)
+	enableSQLiteForeignKeys(t, app, databaseConfig.Driver)
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close test application: %s: %v", message, err)
@@ -63,7 +64,7 @@ func newOrderTestServerWithUsers(t *testing.T, userCount int) (*server.Server, [
 		t.Fatalf("run %s user and order migrations: %v", databaseConfig.Driver, err)
 	}
 	if databaseConfig.Driver != database.SQLITE {
-		resetSQLTestTables(t, app)
+		resetSQLTestTables(t, app, "orders", "users")
 	}
 
 	userIDs := make([]string, 0, userCount)

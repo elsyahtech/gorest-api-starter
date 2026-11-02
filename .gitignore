@@ -64,3 +64,4 @@ go.work.sum
 .idea/
 .vscode/
 .DS_Store
+/app/config/hanya_referensi.txt

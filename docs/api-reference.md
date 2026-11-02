@@ -1,6 +1,6 @@
 # Example API reference
 
-All endpoints on this page use the `/examples` prefix. They demonstrate application features and do not have authentication or authorization. Do not use them as a public business API without securing and adapting the implementation.
+All endpoints on this page use the `/examples` prefix and demonstrate application features; they are not a production API contract. Most routes are unauthenticated. `POST /examples/login` issues an access cookie, and only `GET /examples/orm-queries/users/with-authentication` requires that token. This authentication example does not provide authorization or protect the other routes. Secure and adapt the implementation before exposing it as a business API.
 
 Default local base URL: `http://127.0.0.1:3000`.
 
@@ -15,6 +15,24 @@ Default local base URL: `http://127.0.0.1:3000`.
 - `PATCH` accepts only the fields supported by that resource. An omitted field is not treated as its zero value.
 - Send the complete resource body for standard `PUT` routes. The selected-columns user route is a documented exception that updates only the columns described below. Use `PATCH` for the explicitly supported partial updates listed below.
 - `HEAD` is registered for the corresponding read routes. Explicit `OPTIONS` routes are registered for the standard user, department, and order resources; the query-example and native-driver routes do not all have dedicated `OPTIONS` handlers.
+
+## Authentication example
+
+| Method | Path | Behavior |
+|---|---|---|
+| `POST` | `/examples/login` | Validate the email and password, then issue an `access` cookie |
+| `GET` | `/examples/orm-queries/users/with-authentication` | List users; requires a valid `access` cookie |
+
+Send a JSON body to log in:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "your-password"
+}
+```
+
+On success, the login response sets an `access` cookie. Send that cookie with the protected GET request; without a valid token, the route returns `401 Unauthorized`. The login route and all other example routes remain publicly callable. This demonstrates token authentication only; it does not implement role, ownership, or other authorization policies.
 
 ### Request body examples
 
@@ -127,6 +145,7 @@ Example patch body:
 | `GET` | `/examples/orm-queries/users/preload` | Preload the department relation |
 | `GET` | `/examples/orm-queries/users/limit?limit=5` | Limit the number of results |
 | `GET` | `/examples/orm-queries/users/pagination?limit=5&offset=0` | Demonstrate limit and offset |
+| `GET` | `/examples/orm-queries/users/with-authentication` | List users; requires a valid access cookie |
 
 The `limit` and `offset` values must be valid integers. The `limit` route requires `limit`; the `pagination` route requires both values.
 

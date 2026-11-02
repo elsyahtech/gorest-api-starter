@@ -16,6 +16,7 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/library"
 	"github.com/elsyahtech/gorest-api-starter/app/model"
 	"github.com/elsyahtech/gorest-api-starter/app/router"
+	"github.com/elsyahtech/gorest/filter"
 	gorestlog "github.com/elsyahtech/gorest/log"
 	gorestredis "github.com/elsyahtech/gorest/redis"
 	"github.com/elsyahtech/gorest/server"
@@ -161,6 +162,7 @@ func newRedisUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 	})
 	app.Use(
 		gorestlog.Run(logConfig),
+		filter.Run(e2eFilterConfig()),
 		gorestredis.Run(gorestredis.Config{
 			Host:    host,
 			Port:    port,
@@ -183,9 +185,9 @@ func newRedisUserTestServer(t *testing.T) (*server.Server, *gorest.App) {
 		t.Fatalf("create Redis E2E HTTP server: %v", err)
 	}
 	userModel := model.NewUserModel(app)
-	userLibrary := library.NewUserLibrary(userModel)
+	userLibrary := library.NewUserLibrary(app, userModel)
 	userHandler := handler.NewUserHandler(app, userLibrary)
-	router.RegisterUserRoutes(testServer.Group("/examples"), userHandler)
+	router.RegisterUserRoutes(app, testServer.Group("/examples"), userHandler)
 	return testServer, app
 }
 
