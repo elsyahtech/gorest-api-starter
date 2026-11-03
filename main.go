@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/config"
@@ -14,92 +13,80 @@ import (
 	"github.com/elsyahtech/gorest/monitoring"
 	"github.com/elsyahtech/gorest/redis"
 	"github.com/elsyahtech/gorest/server"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	databaseConfig, err := config.LoadDatabase()
+	if err := godotenv.Load(); err != nil {
+		failConfiguration(err)
+	}
+
+	// =====================================================================
+	// 1. Set app configuration
+	// =====================================================================
+	appConfig, err := config.AppConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	serverConfig, err := config.LoadServer()
+	loggerConfig, err := config.LoggerConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	redisConfig, err := config.LoadRedis()
+	serverConfig, err := config.ServerConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	filterConfig, err := config.LoadFilters()
+	databaseConfig, err := config.DatabaseConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	monitoringConfig, err := config.LoadMonitoring()
+	redisConfig, err := config.RedisConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	if config.Environment() == gorest.Production {
-		if err := requireProductionRedis(redisConfig); err != nil {
-			failConfiguration(err)
-		}
+	filterConfig, err := config.FilterConfig()
+	if err != nil {
+		failConfiguration(err)
 	}
 
-	// Initialize the application and its shared configuration.
-	app := gorest.New(gorest.Config{
-		AppName:         "gorest-api-starter",
-		Version:         "1.0.0",
-		Environment:     config.Environment(),
-		Timezone:        "Asia/Jakarta",
-		Debug:           false,
-		CheckForUpdates: gorest.EnableAutoUpdate,
-	})
+	monitoringConfig, err := config.MonitoringConfig()
+	if err != nil {
+		failConfiguration(err)
+	}
 
-	// Register application services before registering routes.
+	// =====================================================================
+	// 2. Initialize application
+	// =====================================================================
+	app := gorest.New(appConfig)
+
+	// =====================================================================
+	// 3. Register application services
+	// =====================================================================
 	app.Use(
-		log.Run(config.Logger()),
-		redis.Run(redisConfig),
-		database.Run(databaseConfig),
-		filter.Run(filterConfig),
+		log.Run(loggerConfig),
 		server.Run(serverConfig),
+		database.Run(databaseConfig),
+		redis.Run(redisConfig),
+		filter.Run(filterConfig),
 		monitoring.Run(monitoringConfig),
 	)
-	if databaseConfig.Driver == database.SQLITE {
-		if err := config.EnableSQLiteForeignKeys(app); err != nil {
-			failConfiguration(err)
-		}
-	}
 
-	// Register the application's route modules.
+	// =====================================================================
+	// 4. Register the application's route modules.
+	// =====================================================================
 	app.RegisterServices([]gorest.RouterRegistrar{
 		router.UserRouter,
-		router.DepartmentRouter,
-		router.OrderRouter,
 	})
 
-	// Start serves requests and manages the application shutdown lifecycle.
+	// =====================================================================
+	// 5. Start the application.
+	// =====================================================================
 	app.Start()
-}
-
-func requireProductionRedis(cfg redis.Config) error {
-	if cfg.Disable {
-		return nil
-	}
-
-	for _, key := range []string{"GOREST_REDIS_HOST", "GOREST_REDIS_PASSWORD"} {
-		if strings.TrimSpace(os.Getenv(key)) == "" {
-			return fmt.Errorf("%s must be set when Redis is enabled in production", key)
-		}
-	}
-
-	if !cfg.TLS {
-		return fmt.Errorf("GOREST_REDIS_TLS must be true when Redis is enabled in production")
-	}
-
-	return nil
 }
 
 func failConfiguration(err error) {

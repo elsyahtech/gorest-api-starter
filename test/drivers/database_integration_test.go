@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/elsyahtech/gorest"
-	appconfig "github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	"github.com/elsyahtech/gorest-api-starter/app/handler"
 	"github.com/elsyahtech/gorest-api-starter/app/library"
@@ -439,11 +438,7 @@ func newIntegrationApp(t *testing.T, config database.Config) *gorest.App {
 		database.Run(config),
 		filter.Run(driverIntegrationFilterConfig()),
 	)
-	if config.Driver == database.SQLITE {
-		if err := appconfig.EnableSQLiteForeignKeys(app); err != nil {
-			t.Fatalf("enable SQLite foreign keys: %v", err)
-		}
-	}
+
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close %s integration app (%s): %v", config.Driver, message, err)

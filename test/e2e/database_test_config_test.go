@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/elsyahtech/gorest"
-	appconfig "github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
 	"github.com/elsyahtech/gorest-api-starter/test/mysqltls"
 	"github.com/elsyahtech/gorest/database"
@@ -98,9 +97,6 @@ func enableSQLiteForeignKeys(t *testing.T, app *gorest.App, driver string) {
 	t.Helper()
 	if database.NormalizeDatabaseDriver(driver) != database.SQLITE {
 		return
-	}
-	if err := appconfig.EnableSQLiteForeignKeys(app); err != nil {
-		t.Fatalf("enable SQLite foreign keys: %v", err)
 	}
 }
 

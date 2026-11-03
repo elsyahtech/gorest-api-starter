@@ -12,8 +12,6 @@ import (
 	"github.com/elsyahtech/gorest/helper"
 )
 
-// Login handles user login requests. It validates the provided credentials and generates an
-// authentication token upon successful login.
 func (lib *UserLibrary) Login(ctx *gorest.Context, req *entity.User) (string, int, error) {
 	if req == nil {
 		return "User payload must not be empty", http.StatusBadRequest,
@@ -48,4 +46,34 @@ func (lib *UserLibrary) Login(ctx *gorest.Context, req *entity.User) (string, in
 	}
 
 	return message, httpCode, nil
+}
+
+func (lib *UserLibrary) CreateUser(req *entity.User) (string, int, error) {
+	if req == nil {
+		return "User payload must not be empty", http.StatusBadRequest,
+			errors.New("add user: request is empty")
+	}
+
+	passwordHashed, message, httpCode, err := helper.GenerateArgon(req.Password)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	req.Password = passwordHashed
+
+	message, httpCode, err = lib.UserModel.CreateUser(req)
+	if err != nil {
+		return message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return message, httpCode, nil
+}
+
+func (lib *UserLibrary) GetUsers() (*[]entity.User, string, int, error) {
+	result, message, httpCode, err := lib.UserModel.GetUsers()
+	if err != nil {
+		return nil, message, httpCode, fmt.Errorf("%w", err)
+	}
+
+	return result, message, httpCode, nil
 }

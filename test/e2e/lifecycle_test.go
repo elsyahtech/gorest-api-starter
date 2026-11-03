@@ -80,9 +80,7 @@ func TestProductionSQLiteAllowsOnlyLocalHosts(t *testing.T) {
 				Timezone:    "UTC",
 			})
 			app.Use(gorestlog.Run(logConfig), database.Run(databaseConfig))
-			if err := config.EnableSQLiteForeignKeys(app); err != nil {
-				t.Fatalf("enable SQLite foreign keys for host %q: %v", host, err)
-			}
+
 			t.Cleanup(func() {
 				if message, _, err := app.Close(); err != nil {
 					t.Errorf("close production SQLite app (%s): %v", message, err)
@@ -221,7 +219,7 @@ func TestProductionSQLitePersistsLocalDataAcrossRestart(t *testing.T) {
 	t.Setenv("GOREST_DB_MIGRATION", "false")
 	t.Setenv("GOREST_DB_SEEDER", "false")
 
-	databaseConfig, err := config.LoadDatabase()
+	databaseConfig, err := config.DatabaseConfig()
 	if err != nil {
 		t.Fatalf("load production SQLite configuration: %v", err)
 	}
@@ -239,9 +237,7 @@ func TestProductionSQLitePersistsLocalDataAcrossRestart(t *testing.T) {
 			Timezone:    "UTC",
 		})
 		app.Use(gorestlog.Run(logConfig), database.Run(databaseConfig))
-		if err := config.EnableSQLiteForeignKeys(app); err != nil {
-			t.Fatalf("enable SQLite foreign keys in production: %v", err)
-		}
+
 		closed := false
 		closeApp := func() {
 			if closed {
@@ -388,9 +384,7 @@ func TestMigrationFailureAbortsStartupTasks(t *testing.T) {
 	databaseConfig.Migration = true
 	databaseConfig.Seeder = false
 	app.Use(gorestlog.Run(logConfig), database.Run(databaseConfig))
-	if err := config.EnableSQLiteForeignKeys(app); err != nil {
-		t.Fatalf("enable SQLite foreign keys before migration test: %v", err)
-	}
+
 	t.Cleanup(func() {
 		if message, _, err := app.Close(); err != nil {
 			t.Errorf("close app after migration failure (%s): %v", message, err)

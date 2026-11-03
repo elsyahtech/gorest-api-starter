@@ -1,10 +1,7 @@
 package config
 
 import (
-	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/elsyahtech/gorest"
@@ -22,121 +19,128 @@ import (
 // These middleware provide request handling controls; applications must still
 // implement authentication, authorization, and any required CSRF protections.
 // Configure TLS at a trusted ingress/reverse proxy or in the server deployment.
-func Server() server.Config {
-	cfg, err := LoadServer()
-	if err != nil {
-		panic(err)
+func ServerConfig() (server.Config, error) {
+	cfg := server.ConfigDefault
+
+	cfg.Host = str(os.Getenv("GOREST_SERVER_HOST"), server.DefaultServerHost)
+	cfg.Port = strToInt(os.Getenv("GOREST_SERVER_PORT"), server.DefaultServerPort)
+	cfg.Recover = &recover.Config{
+		EnableStackTrace: strToBool(os.Getenv("GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE"), false),
 	}
 
-	return cfg
-}
-
-// LoadServer applies deployment-specific bind and CORS settings. In production,
-// bind settings must be explicit so the local loopback example is not reused.
-func LoadServer() (server.Config, error) {
-	if err := validateEnvironment(); err != nil {
-		return server.Config{}, err
+	cfg.Requestid = &requestid.Config{
+		Header: os.Getenv("GOREST_SERVER_REQUEST_ID_HEADER"),
 	}
 
-	port := 3000
-
-	if value, ok := os.LookupEnv("GOREST_SERVER_PORT"); ok {
-		parsed, err := strconv.Atoi(strings.TrimSpace(value))
-
-		if err != nil || parsed < 1 || parsed > 65535 {
-			return server.Config{}, fmt.Errorf("GOREST_SERVER_PORT must be an integer between 1 and 65535")
-		}
-
-		port = parsed
+	cfg.Compress = &compress.Config{
+		Level: compress.Level(strToInt(os.Getenv("GOREST_SERVER_COMPRESS_LEVEL"), int(compress.LevelDefault))),
 	}
 
-	host := envString("GOREST_SERVER_HOST", "127.0.0.1")
-	origins := csvEnv("GOREST_CORS_ORIGINS")
+	cfg.Core = fiberCoreConfig()
 
+	origins := toStrArray("GOREST_SERVER_CORS_ORIGINS", []string{"http://localhost:3000", "http://127.0.0.1:3000"})
 	if len(origins) == 0 {
 		origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
 
-	if Environment() == gorest.Production {
-		if err := requireProductionEnv("GOREST_SERVER_HOST"); err != nil {
-			return server.Config{}, err
-		}
-
-		if err := requireProductionEnv("GOREST_SERVER_PORT"); err != nil {
-			return server.Config{}, err
-		}
-
-		if err := requireProductionEnv("GOREST_CORS_ORIGINS"); err != nil {
-			return server.Config{}, err
-		}
-
-		if len(csvEnv("GOREST_CORS_ORIGINS")) == 0 {
-			return server.Config{}, fmt.Errorf("GOREST_CORS_ORIGINS must contain at least one origin when APP_ENV=production")
-		}
+	methods := toStrArray("GOREST_SERVER_CORS_METHODS", []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+	if len(methods) == 0 {
+		methods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	}
 
-	return server.Config{
-		// Keep request timeouts finite and cap the body size. These timeout values
-		// match GOREST defaults; adjust them for the application's workload.
-		Core: &fiber.Config{
-			BodyLimit:    4 * 1024 * 1024, // 4 MiB
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			IdleTimeout:  120 * time.Second,
-		},
+	headers := toStrArray("GOREST_SERVER_CORS_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"})
+	if len(headers) == 0 {
+		headers = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"}
+	}
 
-		Cors: &cors.Config{
-			AllowOrigins: origins,
-			AllowMethods: []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-			AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
-			MaxAge:       300,
-		},
+	cfg.Cors = &cors.Config{
+		AllowOrigins:          origins,
+		AllowMethods:          methods,
+		AllowHeaders:          headers,
+		ExposeHeaders:         toStrArray("GOREST_SERVER_CORS_EXPOSE_HEADERS", []string{}),
+		MaxAge:                strToInt(os.Getenv("GOREST_SERVER_CORS_MAX_AGE"), 300),
+		AllowCredentials:      strToBool(os.Getenv("GOREST_SERVER_CORS_ALLOW_CREDENTIALS"), false),
+		AllowPrivateNetwork:   strToBool(os.Getenv("GOREST_SERVER_CORS_ALLOW_PRIVATE_NETWORK"), false),
+		DisableValueRedaction: strToBool(os.Getenv("GOREST_SERVER_CORS_DISABLE_VALUE_REDACTION"), false),
+	}
 
-		// Recover converts handler panics into HTTP errors. It does not replace
-		// input validation or application error handling.
-		Recover: &recover.ConfigDefault,
+	cfg.Helmet = &helmet.Config{
+		XSSProtection:             os.Getenv("GOREST_SERVER_HELMET_XSS_PROTECTION"),
+		ContentTypeNosniff:        os.Getenv("GOREST_SERVER_HELMET_CONTENT_TYPE_NOSNIFF"),
+		XFrameOptions:             os.Getenv("GOREST_SERVER_HELMET_X_FRAME_OPTIONS"),
+		ContentSecurityPolicy:     os.Getenv("GOREST_SERVER_HELMET_CONTENT_SECURITY_POLICY"),
+		ReferrerPolicy:            os.Getenv("GOREST_SERVER_HELMET_REFERRER_POLICY"),
+		PermissionPolicy:          os.Getenv("GOREST_SERVER_HELMET_PERMISSION_POLICY"),
+		CrossOriginEmbedderPolicy: os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_EMBEDDER_POLICY"),
+		CrossOriginOpenerPolicy:   os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_OPENER_POLICY"),
+		CrossOriginResourcePolicy: os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_RESOURCE_POLICY"),
+		OriginAgentCluster:        os.Getenv("GOREST_SERVER_HELMET_ORIGIN_AGENT_CLUSTER"),
+		XDNSPrefetchControl:       os.Getenv("GOREST_SERVER_HELMET_X_DNS_PREFETCH_CONTROL"),
+		XDownloadOptions:          os.Getenv("GOREST_SERVER_HELMET_X_DOWNLOAD_OPTIONS"),
+		XPermittedCrossDomain:     os.Getenv("GOREST_SERVER_HELMET_X_PERMITTED_CROSS_DOMAIN"),
+		HSTSMaxAge:                strToInt(os.Getenv("GOREST_SERVER_HELMET_HSTS_MAX_AGE"), 0),
+		HSTSExcludeSubdomains:     strToBool(os.Getenv("GOREST_SERVER_HELMET_HSTS_EXCLUDE_SUBDOMAINS"), false),
+		CSPReportOnly:             strToBool(os.Getenv("GOREST_SERVER_HELMET_CSP_REPORT_ONLY"), false),
+		HSTSPreloadEnabled:        strToBool(os.Getenv("GOREST_SERVER_HELMET_HSTS_PRELOAD_ENABLED"), false),
+	}
 
-		// Attach a request ID to make logs and request troubleshooting easier.
-		Requestid: &requestid.ConfigDefault,
+	cfg.Limiter = &limiter.Config{
+		Max:                    strToInt(os.Getenv("GOREST_SERVER_RATE_LIMIT_MAX"), 50),
+		Expiration:             strToTimeDuration(os.Getenv("GOREST_SERVER_RATE_LIMIT_EXPIRATION"), time.Minute),
+		SkipFailedRequests:     strToBool(os.Getenv("GOREST_SERVER_RATE_LIMIT_SKIP_FAILED_REQUESTS"), false),
+		SkipSuccessfulRequests: strToBool(os.Getenv("GOREST_SERVER_RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS"), false),
+		DisableHeaders:         strToBool(os.Getenv("GOREST_SERVER_RATE_LIMIT_DISABLE_HEADERS"), false),
+		DisableValueRedaction:  strToBool(os.Getenv("GOREST_SERVER_RATE_LIMIT_DISABLE_VALUE_REDACTION"), false),
+	}
 
-		// Compress eligible responses to reduce response size.
-		Compress: &compress.ConfigDefault,
-
-		// Add common HTTP security headers. These headers do not replace
-		// authentication, authorization, or secure deployment configuration.
-		Helmet: &helmet.ConfigDefault,
-
-		// The default limiter uses in-memory storage, so limits apply per process.
-		// Use shared storage or an upstream gateway if limits must span instances.
-		// Review proxy trust settings before relying on client IP behind a proxy.
-		Limiter: &limiter.Config{
-			Max:        50,
-			Expiration: time.Minute,
-		},
-
-		// Local-only by default. In a container, bind to 0.0.0.0 only when the
-		// deployment network/firewall controls which clients can reach the service.
-		Host: host,
-		Port: port,
-	}, nil
+	return cfg, nil
 }
 
-func csvEnv(key string) []string {
-	value := strings.TrimSpace(os.Getenv(key))
-
-	if value == "" {
-		return []string{}
+func fiberCoreConfig() *fiber.Config {
+	return &fiber.Config{
+		ServerHeader:                 os.Getenv("GOREST_SERVER_HEADER"),
+		StrictRouting:                strToBool(os.Getenv("GOREST_SERVER_STRICT_ROUTING"), false),
+		CaseSensitive:                strToBool(os.Getenv("GOREST_SERVER_CASE_SENSITIVE"), false),
+		SkipUnmatchedRoutes:          strToBool(os.Getenv("GOREST_SERVER_SKIP_UNMATCHED_ROUTES"), false),
+		DisableHeadAutoRegister:      strToBool(os.Getenv("GOREST_SERVER_DISABLE_HEAD_AUTO_REGISTER"), false),
+		DisableFlashMessages:         strToBool(os.Getenv("GOREST_SERVER_DISABLE_FLASH_MESSAGES"), false),
+		Immutable:                    strToBool(os.Getenv("GOREST_SERVER_IMMUTABLE"), false),
+		UnescapePath:                 strToBool(os.Getenv("GOREST_SERVER_UNESCAPE_PATH"), false),
+		BodyLimit:                    strToInt(os.Getenv("GOREST_SERVER_BODY_LIMIT"), server.DefaultServerBodyLimit),
+		MaxRanges:                    strToInt(os.Getenv("GOREST_SERVER_MAX_RANGES"), fiber.DefaultMaxRanges),
+		Concurrency:                  strToInt(os.Getenv("GOREST_SERVER_CONCURRENCY"), fiber.DefaultConcurrency),
+		ViewsLayout:                  os.Getenv("GOREST_SERVER_VIEWS_LAYOUT"),
+		PassLocalsToViews:            strToBool(os.Getenv("GOREST_SERVER_PASS_LOCALS_TO_VIEWS"), false),
+		PassLocalsToContext:          strToBool(os.Getenv("GOREST_SERVER_PASS_LOCALS_TO_CONTEXT"), false),
+		ReadTimeout:                  strToTimeDuration(os.Getenv("GOREST_SERVER_READ_TIMEOUT"), server.DefaultServerReadTimeout),
+		WriteTimeout:                 strToTimeDuration(os.Getenv("GOREST_SERVER_WRITE_TIMEOUT"), server.DefaultServerWriteTimeout),
+		IdleTimeout:                  strToTimeDuration(os.Getenv("GOREST_SERVER_IDLE_TIMEOUT"), server.DefaultServerIdleTimeout),
+		ReadBufferSize:               strToInt(os.Getenv("GOREST_SERVER_READ_BUFFER_SIZE"), fiber.DefaultReadBufferSize),
+		WriteBufferSize:              strToInt(os.Getenv("GOREST_SERVER_WRITE_BUFFER_SIZE"), fiber.DefaultWriteBufferSize),
+		ProxyHeader:                  os.Getenv("GOREST_SERVER_PROXY_HEADER"),
+		GETOnly:                      strToBool(os.Getenv("GOREST_SERVER_GET_ONLY"), false),
+		DisableKeepalive:             strToBool(os.Getenv("GOREST_SERVER_DISABLE_KEEPALIVE"), false),
+		DisableDefaultDate:           strToBool(os.Getenv("GOREST_SERVER_DISABLE_DEFAULT_DATE"), false),
+		DisableDefaultContentType:    strToBool(os.Getenv("GOREST_SERVER_DISABLE_DEFAULT_CONTENT_TYPE"), false),
+		DisableHeaderNormalizing:     strToBool(os.Getenv("GOREST_SERVER_DISABLE_HEADER_NORMALIZING"), false),
+		AppName:                      str(os.Getenv("GOREST_APP_NAME"), gorest.DefaultAppName),
+		SharedStatePrefix:            os.Getenv("GOREST_SERVER_SHARED_STATE_PREFIX"),
+		StreamRequestBody:            strToBool(os.Getenv("GOREST_SERVER_STREAM_REQUEST_BODY"), false),
+		DisablePreParseMultipartForm: strToBool(os.Getenv("GOREST_SERVER_DISABLE_PRE_PARSE_MULTIPART_FORM"), false),
+		ReduceMemoryUsage:            strToBool(os.Getenv("GOREST_SERVER_REDUCE_MEMORY_USAGE"), false),
+		TrustProxy:                   strToBool(os.Getenv("GOREST_SERVER_TRUST_PROXY"), false),
+		TrustProxyConfig: fiber.TrustProxyConfig{
+			Proxies:   toStrArray("GOREST_SERVER_TRUST_PROXY_PROXIES", []string{}),
+			LinkLocal: strToBool(os.Getenv("GOREST_SERVER_TRUST_PROXY_LINK_LOCAL"), false),
+			Loopback:  strToBool(os.Getenv("GOREST_SERVER_TRUST_PROXY_LOOPBACK"), false),
+			Private:   strToBool(os.Getenv("GOREST_SERVER_TRUST_PROXY_PRIVATE"), false),
+			UnixSocket: strToBool(
+				os.Getenv("GOREST_SERVER_TRUST_PROXY_UNIX_SOCKET"),
+				false,
+			),
+		},
+		EnableIPValidation:       strToBool(os.Getenv("GOREST_SERVER_ENABLE_IP_VALIDATION"), false),
+		RequestMethods:           toStrArray("GOREST_SERVER_REQUEST_METHODS", []string{}),
+		EnableSplittingOnParsers: strToBool(os.Getenv("GOREST_SERVER_ENABLE_SPLITTING_ON_PARSERS"), false),
 	}
-
-	items := strings.Split(value, ",")
-
-	result := make([]string, 0, len(items))
-
-	for _, item := range items {
-		if trimmed := strings.TrimSpace(item); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-
-	return result
 }

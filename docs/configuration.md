@@ -13,7 +13,7 @@ This starter enables GOREST's `CheckForUpdates` option in `main.go`. At startup,
 `app/config/server.go` sets:
 
 - Local host `127.0.0.1` and port `3000`.
-- A 4 MiB body limit and read, write, and idle timeouts.
+- A configurable request body limit and read, write, and idle timeouts (`GOREST_SERVER_BODY_LIMIT`, `GOREST_SERVER_READ_TIMEOUT`, `GOREST_SERVER_WRITE_TIMEOUT`, and `GOREST_SERVER_IDLE_TIMEOUT`). Durations use Go duration syntax, such as `10s` or `2m`; blank values use the local defaults.
 - CORS origins from `GOREST_CORS_ORIGINS` (comma-separated); local defaults are restricted to localhost.
 - Recover, request ID, compression, helmet, and rate limiter middleware.
 - GOREST's built-in operational endpoints are registered by default through `monitoring.Run`. The framework default allowlist is empty, but this starter defaults to loopback-only access (`127.0.0.1` and `::1`). Configure `GOREST_HTTP_METRICS_ALLOWED_IPS` to allow additional trusted health-check clients, or set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable the routes entirely. An explicitly empty `GOREST_HTTP_METRICS_ALLOWED_IPS` denies all callers. The allowlist checks the TCP peer IP (the reverse proxy IP when proxied), not forwarded headers; it is not user authentication. See [operational monitoring endpoints](#operational-monitoring-endpoints).
@@ -103,7 +103,18 @@ The logger writes to `./logs/app.log` and has rotation settings in `app/config/l
 | :-- | :-- | :-- |
 | `APP_ENV` | GOREST runtime environment (`development`, `production`, or `testing`) | `development` |
 | `GOREST_SERVER_HOST`, `GOREST_SERVER_PORT` | HTTP bind address and port | `127.0.0.1`, `3000` |
-| `GOREST_CORS_ORIGINS` | Comma-separated allowed browser origins | `http://localhost:3000`, `http://127.0.0.1:3000` |
+| `GOREST_SERVER_BODY_LIMIT` | Maximum request body size in bytes | `4194304` |
+| `GOREST_SERVER_READ_TIMEOUT`, `GOREST_SERVER_WRITE_TIMEOUT`, `GOREST_SERVER_IDLE_TIMEOUT` | HTTP read, write, and idle timeouts; Go duration syntax | `10s`, `30s`, `120s` |
+| `GOREST_CORS_ORIGINS`, `GOREST_CORS_METHODS`, `GOREST_CORS_HEADERS`, `GOREST_CORS_EXPOSE_HEADERS` | Comma-separated CORS origins, methods, allowed request headers, and exposed response headers | Local origins; `GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS`; `Origin,Content-Type,Accept,Authorization,X-Request-ID`; empty |
+| `GOREST_CORS_MAX_AGE`, `GOREST_CORS_ALLOW_CREDENTIALS`, `GOREST_CORS_ALLOW_PRIVATE_NETWORK`, `GOREST_CORS_DISABLE_VALUE_REDACTION` | CORS preflight cache age in seconds and CORS behavior flags | `300`; `false` |
+| `GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE` | Include stack traces in recovered panic handling | `false` |
+| `GOREST_SERVER_REQUEST_ID_HEADER` | Request ID header name | `X-Request-ID` |
+| `GOREST_SERVER_COMPRESS_LEVEL` | Compression level: `-1` disabled, `0` default, `1` best speed, `2` best compression | `0` |
+| `GOREST_SERVER_HELMET_*` | Helmet security-header values, HSTS max age, and CSP/HSTS flags; see `.env-example` for the individual field names | GOREST middleware defaults |
+| `GOREST_SERVER_RATE_LIMIT_MAX`, `GOREST_SERVER_RATE_LIMIT_EXPIRATION` | Maximum requests per in-memory rate-limit window and its duration | `50`, `1m` |
+| `GOREST_SERVER_RATE_LIMIT_SKIP_FAILED_REQUESTS`, `GOREST_SERVER_RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS`, `GOREST_SERVER_RATE_LIMIT_DISABLE_HEADERS`, `GOREST_SERVER_RATE_LIMIT_DISABLE_VALUE_REDACTION` | Rate-limiter behavior flags | `false` |
+
+`.env-example` lists the scalar and list settings exposed by this starter's server configuration. Middleware callbacks, custom storage, and custom handlers remain code-level configuration rather than environment variables.
 | `GOREST_HTTP_METRICS_ALLOWED_IPS` | Comma-separated IP addresses/CIDRs allowed to access built-in `/gorest` endpoints; an explicitly empty value denies all | `127.0.0.1,::1` |
 | `GOREST_DISABLE_MONITORING_ENDPOINTS` | Disable registration of built-in monitoring endpoints | `false` (routes are registered; loopback callers are allowed) |
 | `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS` | Include route-level breakdown in `/gorest/http` metrics | `false` |
