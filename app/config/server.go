@@ -93,6 +93,12 @@ func ServerConfig() (server.Config, error) {
 		DisableValueRedaction:  strToBool(os.Getenv("GOREST_SERVER_RATE_LIMIT_DISABLE_VALUE_REDACTION"), false),
 	}
 
+	listener, err := loadServerListenerConfig()
+	if err != nil {
+		return server.Config{}, err
+	}
+	cfg.Listener = listener
+
 	return cfg, nil
 }
 

@@ -1,6 +1,6 @@
 # Gorest API Starter Documentation
 
-This documentation is the application-specific guide for developers adopting or adapting the starter as their application foundation. It explains how this repository wires GOREST, and what the included examples do. It does not replace the framework reference: use the [GOREST v1.1.15 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.15/docs) for framework APIs and guarantees.
+This documentation is the application-specific guide for developers adopting or adapting the starter as their application foundation. It explains how this repository wires GOREST, and what the included examples do. It does not replace the framework reference: use the [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs) for framework APIs and guarantees.
 
 ## Learning path
 

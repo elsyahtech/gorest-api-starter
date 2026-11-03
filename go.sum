@@ -32,6 +32,8 @@ github.com/ebitengine/purego v0.11.1 h1:2zpWRSQNVKN4eKsKO9eM1ILDgWfYMY9GwqRmK6Xe
 github.com/ebitengine/purego v0.11.1/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
 github.com/elsyahtech/gorest v1.1.16 h1:4JV0ypsuHs4fR8tjSOFGJ1hPkJocSSxacaF5d/EIx60=
 github.com/elsyahtech/gorest v1.1.16/go.mod h1:WLqob+H6rGRllvXKTefzIqppO6MXE1vEtT6BqnkwTAc=
+github.com/elsyahtech/gorest v1.1.17 h1:m93hpg1Mh4/ydv/pN/a8tM10mP8r9Hx2HVb5z9Pqn7o=
+github.com/elsyahtech/gorest v1.1.17/go.mod h1:WLqob+H6rGRllvXKTefzIqppO6MXE1vEtT6BqnkwTAc=
 github.com/fxamacker/cbor/v2 v2.9.6 h1:NHZPxuUjJXQjX9itA785y/5NKSlI4HQ+S7noZsmI7hs=
 github.com/fxamacker/cbor/v2 v2.9.6/go.mod h1:4EaZp6ClVunETjQ4GHmGNzysDK91Lr+r6Yz6tJqzVCw=
 github.com/go-logfmt/logfmt v0.6.1 h1:4hvbpePJKnIzH1B+8OR/JPbTx37NktoI9LE2QZBBkvE=
