@@ -7,9 +7,9 @@ import (
 func Monitoring() monitoring.Config {
 	cfg := monitoring.ConfigDefault
 
-	cfg.HTTPMetricsAllowedIPs = []string{"127.0.0.1", "::1"}
+	cfg.MonitoringAllowedIPs = []string{"127.0.0.1", "::1"}
 	cfg.DisableMonitoringEndpoints = false
-	cfg.EnablePerRouteHTTPMetrics = false
+	cfg.EnableHTTPMetricsMonitoring = false
 
 	return cfg
 }
@@ -19,7 +19,7 @@ func LoadMonitoring() (monitoring.Config, error) {
 
 	var err error
 
-	cfg.HTTPMetricsAllowedIPs, err = envStringSlice("GOREST_HTTP_METRICS_ALLOWED_IPS", cfg.HTTPMetricsAllowedIPs)
+	cfg.MonitoringAllowedIPs, err = envStringSlice("GOREST_HTTP_METRICS_ALLOWED_IPS", cfg.MonitoringAllowedIPs)
 	if err != nil {
 		return monitoring.Config{}, err
 	}
@@ -28,7 +28,7 @@ func LoadMonitoring() (monitoring.Config, error) {
 		return monitoring.Config{}, err
 	}
 
-	if cfg.EnablePerRouteHTTPMetrics, err = envBool("GOREST_ENABLE_PER_ROUTE_HTTP_METRICS", cfg.EnablePerRouteHTTPMetrics); err != nil {
+	if cfg.EnableHTTPMetricsMonitoring, err = envBool("GOREST_ENABLE_PER_ROUTE_HTTP_METRICS", cfg.EnableHTTPMetricsMonitoring); err != nil {
 		return monitoring.Config{}, err
 	}
 

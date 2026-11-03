@@ -48,8 +48,8 @@ func TestMonitoringEndpointsRespectAllowlistAndDisableSetting(t *testing.T) {
 
 	t.Run("allowlisted peer can access monitoring endpoints", func(t *testing.T) {
 		config := monitoring.Config{
-			HTTPMetricsAllowedIPs:     []string{"0.0.0.0/0", "::/0"},
-			EnablePerRouteHTTPMetrics: true,
+			MonitoringAllowedIPs:        []string{"0.0.0.0/0", "::/0"},
+			EnableHTTPMetricsMonitoring: true,
 		}
 		httpServer := newMonitoringHTTPServer(t, dbConfig, db, config)
 
@@ -71,7 +71,7 @@ func TestMonitoringEndpointsRespectAllowlistAndDisableSetting(t *testing.T) {
 
 func TestMonitoringRejectsInvalidAllowlistDuringInitialization(t *testing.T) {
 	_, err := monitoring.New(monitoring.Config{
-		HTTPMetricsAllowedIPs: []string{"not-an-ip"},
+		MonitoringAllowedIPs: []string{"not-an-ip"},
 	})
 	if err == nil {
 		t.Fatal("monitoring.New() succeeded with an invalid IP allowlist entry")

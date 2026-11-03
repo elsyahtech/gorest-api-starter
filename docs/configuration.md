@@ -20,6 +20,40 @@ This starter enables GOREST's `CheckForUpdates` option in `main.go`. At startup,
 
 Set `GOREST_SERVER_HOST` and `GOREST_SERVER_PORT` for deployments. Both are required when `APP_ENV=production`, preventing accidental use of the loopback/local bind defaults. Set CORS to the exact browser origins you trust. CORS is a browser policy, not authentication. The default rate limiter uses in-memory storage, so its limit applies to each process rather than across all instances. If you run the application in a container, bind to an address reachable by the proxy and restrict access at the network boundary.
 
+### Listener configuration
+
+The starter maps the following optional environment variables to GOREST v1.1.17's `server.Config.Listener`. Leave a value empty to use GOREST's default; these deployment options are independent of the HTTP middleware settings above.
+
+| Variable | Purpose | Empty-value default |
+|---|---|---|
+| `GOREST_SERVER_LISTENER_NETWORK` | Listener network: `tcp`, `tcp4`, `tcp6`, or `unix` | `tcp4` |
+| `GOREST_SERVER_UNIX_SOCKET_PATH` | Unix socket path; required when network is `unix` | Not applicable |
+| `GOREST_SERVER_CERT_FILE`, `GOREST_SERVER_CERT_KEY_FILE` | Server TLS certificate and private key; configure both to enable HTTPS | TLS disabled |
+| `GOREST_SERVER_CERT_CLIENT_FILE` | Client CA bundle; configure with server TLS to require mutual TLS | Client certificates not required |
+| `GOREST_SERVER_TLS_MIN_VERSION` | Minimum TLS version: `1.2` or `1.3` | TLS 1.2 |
+| `GOREST_SERVER_SHUTDOWN_TIMEOUT` | Grace period for HTTP server shutdown, as a Go duration | 30s |
+| `GOREST_SERVER_UNIX_SOCKET_FILE_MODE` | Unix socket permission mode in octal, for example `0770` | `0770` |
+| `GOREST_SERVER_PREFORK_RECOVER_INTERVAL` | Delay before restarting a crashed prefork worker, as a Go duration | `0s` (immediate restart) |
+| `GOREST_SERVER_PREFORK_SHUTDOWN_GRACE_PERIOD` | Time to wait for prefork workers before force-stopping them | 5s |
+| `GOREST_SERVER_PREFORK_RECOVER_THRESHOLD` | Worker restart threshold | GOREST default (at least 1) |
+| `GOREST_SERVER_ENABLE_PREFORK` | Run GOREST-managed worker processes | Disabled |
+| `GOREST_SERVER_ENABLE_PRINT_ROUTES` | Include the route list in startup output | Disabled |
+
+For TCP listeners, `GOREST_SERVER_HOST` and `GOREST_SERVER_PORT` select the bind address. For Unix sockets, set the network to `unix` and provide the socket path. TLS certificate and key must be provided together; the client CA is only meaningful with server TLS. GOREST validates unsupported networks, incomplete TLS settings, invalid TLS versions, and incompatible prefork settings during server initialization. Durations use Go syntax such as `30s` or `2m`; negative values are invalid. Unix socket mode must be an octal value from `0000` through `0777`.
+
+GOREST-managed prefork is supported on macOS and Linux and only with `tcp4` or `tcp6`. Each worker initializes the application independently, so in-memory state (including rate limits and HTTP metrics) is not shared. The shutdown grace period controls worker termination and should be configured consistently with the HTTP shutdown timeout and the longest request that must finish. Enable prefork only after validating the application's dependencies and deployment process model.
+
+Example HTTPS listener configuration:
+
+```sh
+export GOREST_SERVER_CERT_FILE=/etc/example/server.crt
+export GOREST_SERVER_CERT_KEY_FILE=/etc/example/server.key
+export GOREST_SERVER_TLS_MIN_VERSION=1.2
+export GOREST_SERVER_SHUTDOWN_TIMEOUT=30s
+```
+
+TLS can instead terminate at a trusted reverse proxy. If so, protect the proxy-to-application network and only configure trusted-proxy behavior when the app needs client addresses from forwarding headers.
+
 ### Operational monitoring endpoints
 
 GOREST registers these built-in routes under `/gorest` by default:
@@ -30,7 +64,7 @@ GOREST registers these built-in routes under `/gorest` by default:
 - `/storage` for estimated storage used by the configured database.
 - `/database` for database and connection-pool metrics.
 
-The framework's default `HTTPMetricsAllowedIPs` is empty, which denies access. This starter overrides that default to allow only IPv4 and IPv6 loopback addresses when `GOREST_HTTP_METRICS_ALLOWED_IPS` is unset. An explicitly empty environment variable restores deny-all behavior. The allowlist is not authentication. GOREST checks the TCP connection's peer IP; behind a reverse proxy, allow only the proxy's trusted address and restrict access at the proxy/network layer as well. Do not allow public caller ranges.
+The framework's default `MonitoringAllowedIPs` is empty, which denies access. This starter overrides that default to allow only IPv4 and IPv6 loopback addresses when `GOREST_HTTP_METRICS_ALLOWED_IPS` is unset. An explicitly empty environment variable restores deny-all behavior. The allowlist is not authentication. GOREST checks the TCP connection's peer IP; behind a reverse proxy, allow only the proxy's trusted address and restrict access at the proxy/network layer as well. Do not allow public caller ranges.
 
 For deployments with health checks running on a trusted non-loopback address, add the exact IP or CIDR:
 
@@ -38,7 +72,7 @@ For deployments with health checks running on a trusted non-loopback address, ad
 export GOREST_HTTP_METRICS_ALLOWED_IPS=127.0.0.1/32,::1/128
 ```
 
-Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration completely. Set `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS=true` only when route-level breakdowns from `/gorest/http` are needed; it adds per-request processing and memory use. `/gorest/storage` is an estimate of database storage, not free filesystem capacity or maximum disk size. For filesystem capacity, use operating-system or infrastructure monitoring. See the [GOREST v1.1.15 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.15/docs/configuration.md#operational-endpoints-and-environment-configuration).
+Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration completely. Set `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS=true` only when route-level breakdowns from `/gorest/http` are needed; it adds per-request processing and memory use. `/gorest/storage` is an estimate of database storage, not free filesystem capacity or maximum disk size. For filesystem capacity, use operating-system or infrastructure monitoring. See the [GOREST v1.1.17 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.17/docs/configuration.md#operational-endpoints-and-environment-configuration).
 
 ## Database and Redis
 
@@ -91,7 +125,7 @@ dbConfig.TLS = "disable"
 dbConfig.AllowInsecureProduction = true
 ```
 
-Invalid boolean values cause configuration loading to fail. See the [testing guide](./testing.md#non-tls-connections-in-local-database-tests) for how this project uses the test-only exception, and the [GOREST v1.1.15 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.15/docs/configuration.md) for framework details.
+Invalid boolean values cause configuration loading to fail. See the [testing guide](./testing.md#non-tls-connections-in-local-database-tests) for how this project uses the test-only exception, and the [GOREST v1.1.17 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.17/docs/configuration.md) for framework details.
 
 ## Logging
 

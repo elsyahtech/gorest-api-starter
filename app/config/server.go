@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"strconv"
@@ -75,6 +76,11 @@ func LoadServer() (server.Config, error) {
 		}
 	}
 
+	listener, err := loadListenerConfig()
+	if err != nil {
+		return server.Config{}, err
+	}
+
 	return server.Config{
 		// Keep request timeouts finite and cap the body size. These timeout values
 		// match GOREST defaults; adjust them for the application's workload.
@@ -116,9 +122,114 @@ func LoadServer() (server.Config, error) {
 
 		// Local-only by default. In a container, bind to 0.0.0.0 only when the
 		// deployment network/firewall controls which clients can reach the service.
-		Host: host,
-		Port: port,
+		Host:     host,
+		Port:     port,
+		Listener: listener,
 	}, nil
+}
+
+func loadListenerConfig() (server.ListenerConfig, error) {
+	listener := server.ListenerConfig{
+		Network:           envString("GOREST_SERVER_LISTENER_NETWORK", ""),
+		TLSCertFile:       envString("GOREST_SERVER_CERT_FILE", ""),
+		TLSCertKeyFile:    envString("GOREST_SERVER_CERT_KEY_FILE", ""),
+		TLSCertClientFile: envString("GOREST_SERVER_CERT_CLIENT_FILE", ""),
+		UnixSocketPath:    envString("GOREST_SERVER_UNIX_SOCKET_PATH", ""),
+	}
+
+	var err error
+	if listener.PreforkRecoverInterval, err = durationEnv("GOREST_SERVER_PREFORK_RECOVER_INTERVAL"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.ShutdownTimeout, err = durationEnv("GOREST_SERVER_SHUTDOWN_TIMEOUT"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.PreforkShutdownGracePeriod, err = durationEnv("GOREST_SERVER_PREFORK_SHUTDOWN_GRACE_PERIOD"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.PreforkRecoverThreshold, err = nonNegativeIntEnv("GOREST_SERVER_PREFORK_RECOVER_THRESHOLD"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.UnixSocketFileMode, err = unixSocketFileModeEnv("GOREST_SERVER_UNIX_SOCKET_FILE_MODE"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.TLSMinVersion, err = tlsMinVersionEnv("GOREST_SERVER_TLS_MIN_VERSION"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.EnablePrefork, err = listenerBoolEnv("GOREST_SERVER_ENABLE_PREFORK"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+	if listener.EnablePrintRoutes, err = listenerBoolEnv("GOREST_SERVER_ENABLE_PRINT_ROUTES"); err != nil {
+		return server.ListenerConfig{}, err
+	}
+
+	return listener, nil
+}
+
+func listenerBoolEnv(key string) (bool, error) {
+	if envString(key, "") == "" {
+		return false, nil
+	}
+
+	return envBool(key, false)
+}
+
+func durationEnv(key string) (time.Duration, error) {
+	value := envString(key, "")
+	if value == "" {
+		return 0, nil
+	}
+
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
+	}
+	if duration < 0 {
+		return 0, fmt.Errorf("%s cannot be negative", key)
+	}
+
+	return duration, nil
+}
+
+func nonNegativeIntEnv(key string) (int, error) {
+	value := envString(key, "")
+	if value == "" {
+		return 0, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0, fmt.Errorf("%s must be a non-negative integer", key)
+	}
+
+	return parsed, nil
+}
+
+func unixSocketFileModeEnv(key string) (os.FileMode, error) {
+	value := envString(key, "")
+	if value == "" {
+		return 0, nil
+	}
+
+	mode, err := strconv.ParseUint(value, 8, 32)
+	if err != nil || mode > 0o777 {
+		return 0, fmt.Errorf("%s must be an octal permission mode between 0000 and 0777", key)
+	}
+
+	return os.FileMode(mode), nil
+}
+
+func tlsMinVersionEnv(key string) (uint16, error) {
+	switch strings.ToLower(envString(key, "")) {
+	case "":
+		return 0, nil
+	case "1.2", "tls1.2":
+		return tls.VersionTLS12, nil
+	case "1.3", "tls1.3":
+		return tls.VersionTLS13, nil
+	default:
+		return 0, fmt.Errorf("%s must be 1.2 or 1.3", key)
+	}
 }
 
 func csvEnv(key string) []string {
