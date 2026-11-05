@@ -412,6 +412,27 @@ func TestLoadDatabaseProductionConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("maps MySQL TLS certificate paths", func(t *testing.T) {
+		setValidProductionEnvironment(t)
+		t.Setenv("GOREST_DB_DRIVER", "mysql")
+		t.Setenv("GOREST_DB_TLS", "true")
+		t.Setenv("GOREST_DB_SSL_CA_PATH", "/run/secrets/mysql-ca.pem")
+		t.Setenv("GOREST_DB_SSL_CERT_PATH", "/run/secrets/mysql-client.pem")
+		t.Setenv("GOREST_DB_SSL_KEY_PATH", "/run/secrets/mysql-client-key.pem")
+
+		cfg, err := LoadDatabase()
+		if err != nil {
+			t.Fatalf("LoadDatabase() with MySQL TLS certificate paths error = %v", err)
+		}
+		if cfg.TLS != "true" ||
+			cfg.SSLCAPath != "/run/secrets/mysql-ca.pem" ||
+			cfg.SSLCertPath != "/run/secrets/mysql-client.pem" ||
+			cfg.SSLKeyPath != "/run/secrets/mysql-client-key.pem" {
+			t.Fatalf("MySQL TLS configuration = (TLS:%q, CA:%q, cert:%q, key:%q), want configured TLS paths",
+				cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
+		}
+	})
+
 	t.Run("allows insecure connections when explicitly enabled outside production", func(t *testing.T) {
 		isolateConfigurationEnvironment(t)
 		t.Setenv("APP_ENV", gorest.Testing)

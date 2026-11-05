@@ -65,3 +65,4 @@ go.work.sum
 .vscode/
 .DS_Store
 /app/config/hanya_referensi.txt
+/cert/

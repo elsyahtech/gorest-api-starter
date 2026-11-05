@@ -75,6 +75,8 @@ func e2eDatabaseConfig(t *testing.T, dataDir, name string) database.Config {
 			config.TLS = tlsMode
 		}
 		config.SSLCAPath = os.Getenv("GOREST_DRIVER_SSL_CA_PATH")
+		config.SSLCertPath = os.Getenv("GOREST_DRIVER_SSL_CERT_PATH")
+		config.SSLKeyPath = os.Getenv("GOREST_DRIVER_SSL_KEY_PATH")
 		if config.TLS != "disable" && config.TLS != "true" {
 			serverName := os.Getenv("GOREST_DRIVER_TLS_SERVER_NAME")
 			if serverName == "" {
@@ -84,8 +86,8 @@ func e2eDatabaseConfig(t *testing.T, dataDir, name string) database.Config {
 				config.TLS,
 				serverName,
 				config.SSLCAPath,
-				os.Getenv("GOREST_DRIVER_SSL_CERT_PATH"),
-				os.Getenv("GOREST_DRIVER_SSL_KEY_PATH"),
+				config.SSLCertPath,
+				config.SSLKeyPath,
 			); err != nil {
 				t.Fatalf("configure MySQL TLS: %v", err)
 			}

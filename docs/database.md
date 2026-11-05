@@ -34,7 +34,16 @@ export GOREST_DB_PORT=3306
 export GOREST_DB_TLS=disable
 ```
 
-For TLS, set `GOREST_DB_TLS=true`. GOREST v1.1.19 passes this mode to the MySQL driver, which uses the system root certificates and verifies the server hostname derived from the connection address. A CA path is not required for this mode, and `GOREST_DB_SSL_CA_PATH` is not used by the MySQL driver. If the server uses a private CA or requires mTLS, register a verified TLS profile with `go-sql-driver/mysql` before initializing the database; the starter does not configure such a profile through environment variables. Do not use `skip-verify` or `preferred` where server identity verification is required.
+For TLS, set `GOREST_DB_TLS=true`. GOREST v1.1.20 uses the system root certificates and verifies the server hostname against `GOREST_DB_HOST` when no CA path is set. A CA path is not needed when the server certificate chains to a trusted system root.
+
+For a private server CA, set `GOREST_DB_SSL_CA_PATH` to its PEM certificate file. For mTLS, also set both `GOREST_DB_SSL_CERT_PATH` and `GOREST_DB_SSL_KEY_PATH` to the client certificate and matching private key; the MySQL server must trust the client certificate and require client authentication. These paths are used directly with `GOREST_DB_TLS=true`, so the application does not need to register a MySQL TLS profile. A named profile registered with `mysql.RegisterTLSConfig` takes precedence over the path settings. Keep the private key readable only by the application account, and do not use `skip-verify` or `preferred` where server identity verification is required.
+
+```sh
+export GOREST_DB_TLS=true
+export GOREST_DB_SSL_CA_PATH=/run/secrets/mysql-ca.pem
+export GOREST_DB_SSL_CERT_PATH=/run/secrets/mysql-client.pem
+export GOREST_DB_SSL_KEY_PATH=/run/secrets/mysql-client-key.pem
+```
 
 ### Oracle
 
@@ -100,7 +109,7 @@ The starter provides connection settings and GOREST emits a warning in productio
 | Driver | TLS behavior available through this starter | Production considerations |
 | :-- | :-- | :-- |
 | SQLite | Not applicable; the database is a local file, not a network connection. | Protect the file, its directory, and backups with host/storage access controls. |
-| MySQL | `GOREST_DB_TLS=true` uses system root certificates and verifies the server hostname; a CA path is not required. | The default `disable` mode is accepted but triggers a production warning. A private CA or mTLS requires a registered, verified TLS profile; this starter does not expose profile registration as an environment setting. |
+| MySQL | `GOREST_DB_TLS=true` uses system root certificates and verifies the server hostname. `GOREST_DB_SSL_CA_PATH` selects a private CA trust pool; `GOREST_DB_SSL_CERT_PATH` and `GOREST_DB_SSL_KEY_PATH` configure mTLS. | The default `disable` mode is accepted but triggers a production warning. For mTLS, the MySQL server must trust the client certificate and require client authentication. |
 | PostgreSQL | `GOREST_DB_TLS` maps to `sslmode`: `disable`, `require`, `verify-ca`, or `verify-full`. CA, client certificate, and key paths use the corresponding `GOREST_DB_SSL_*_PATH` settings. | `require` encrypts without verifying the server identity; `verify-ca` checks the CA chain but not the hostname. `verify-full` with a trusted CA provides certificate and hostname verification. `allow` and `prefer` can fall back to plaintext. |
 | Oracle | `enable` selects TCPS and uses `GOREST_DB_SSL_CA_PATH` as the Oracle wallet/configuration directory; `disable` uses TCP. | TCPS needs a correctly configured wallet and compatible Oracle service. `GOREST_DB_LIB_DIR` selects the Instant Client location when it is not on the system library path. |
 | SQL Server | `GOREST_DB_TLS` maps to the driver's `encrypt` setting (for example, `mandatory` or `strict`). The starter keeps `TrustServerCertificate=false`. | Use a server certificate trusted by the client. This starter does not expose `TrustServerCertificate` as an environment override. |

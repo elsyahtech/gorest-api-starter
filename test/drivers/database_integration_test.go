@@ -380,13 +380,15 @@ func integrationDatabaseConfig(t *testing.T, driver string) (database.Config, st
 		config.Name = databaseName
 		config.TLS = envOr("GOREST_DRIVER_TLS", "disable")
 		config.SSLCAPath = os.Getenv("GOREST_DRIVER_SSL_CA_PATH")
+		config.SSLCertPath = os.Getenv("GOREST_DRIVER_SSL_CERT_PATH")
+		config.SSLKeyPath = os.Getenv("GOREST_DRIVER_SSL_KEY_PATH")
 		if config.TLS != "disable" && config.TLS != "true" {
 			if err := mysqltls.RegisterProfile(
 				config.TLS,
 				envOr("GOREST_DRIVER_TLS_SERVER_NAME", config.Host),
 				config.SSLCAPath,
-				os.Getenv("GOREST_DRIVER_SSL_CERT_PATH"),
-				os.Getenv("GOREST_DRIVER_SSL_KEY_PATH"),
+				config.SSLCertPath,
+				config.SSLKeyPath,
 			); err != nil {
 				t.Fatalf("configure MySQL TLS: %v", err)
 			}

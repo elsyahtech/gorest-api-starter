@@ -70,6 +70,8 @@ The complete MySQL E2E suite passed, as did `TestDatabaseDriverIntegration`, app
 
 **TLS:** a test-only `go-sql-driver/mysql` profile verified the server certificate chain and hostname, and presented the configured client certificate for mTLS. TLS certificate verification remained enabled.
 
+This historical run used a registered TLS profile. GOREST v1.1.20 also supports configuring the CA and client certificate/key paths directly with `TLS=true`; current setup instructions are in the [MySQL TLS test guide](../testing.md#mysql-tls-configuration-in-integration-tests).
+
 **Result:** `PASS` for `TestDatabaseDriverIntegration` and the complete MySQL E2E suite, including login, protected-route access, CRUD, native SQL, transaction rollback, request validation, concurrency, startup failure, and lifecycle scenarios. The ordinary `go test ./... -count=1` suite also passed with the default local setup.
 
 One initial full E2E attempt encountered a remote connection reset late in the suite. The failing E2E scenario passed when rerun individually, and the complete suite passed on a subsequent full run. MongoDB, ScyllaDB, and Redis-specific E2E scenarios remained skipped because this run was scoped to MySQL. The test target is disposable and the suite ran migrations, seeders, and data-changing scenarios against it.
