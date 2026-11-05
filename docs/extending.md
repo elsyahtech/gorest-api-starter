@@ -1,6 +1,6 @@
 # Adding features
 
-This guide explains the application patterns used in the starter. For route syntax, helpers, ORM usage, and framework APIs, see the [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs), which matches the version in `go.mod`.
+This guide explains the application patterns used in the starter. For route syntax, helpers, ORM usage, and framework APIs, see the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs).
 
 ## Change flow
 

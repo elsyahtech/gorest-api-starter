@@ -1,0 +1,1389 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>config: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/elsyahtech/gorest-api-starter/app/config/app.go (82.4%)</option>
+				
+				<option value="file1">github.com/elsyahtech/gorest-api-starter/app/config/database.go (86.7%)</option>
+				
+				<option value="file2">github.com/elsyahtech/gorest-api-starter/app/config/filter.go (85.0%)</option>
+				
+				<option value="file3">github.com/elsyahtech/gorest-api-starter/app/config/helper.go (98.6%)</option>
+				
+				<option value="file4">github.com/elsyahtech/gorest-api-starter/app/config/logger.go (90.9%)</option>
+				
+				<option value="file5">github.com/elsyahtech/gorest-api-starter/app/config/monitoring.go (87.5%)</option>
+				
+				<option value="file6">github.com/elsyahtech/gorest-api-starter/app/config/redis.go (87.9%)</option>
+				
+				<option value="file7">github.com/elsyahtech/gorest-api-starter/app/config/server.go (72.7%)</option>
+				
+				<option value="file8">github.com/elsyahtech/gorest-api-starter/app/config/server_listener.go (84.2%)</option>
+				
+				<option value="file9">github.com/elsyahtech/gorest-api-starter/app/handler/handler.go (100.0%)</option>
+				
+				<option value="file10">github.com/elsyahtech/gorest-api-starter/app/handler/user_handler.go (59.5%)</option>
+				
+				<option value="file11">github.com/elsyahtech/gorest-api-starter/app/library/library.go (100.0%)</option>
+				
+				<option value="file12">github.com/elsyahtech/gorest-api-starter/app/library/user_library.go (69.0%)</option>
+				
+				<option value="file13">github.com/elsyahtech/gorest-api-starter/app/model/model.go (0.0%)</option>
+				
+				<option value="file14">github.com/elsyahtech/gorest-api-starter/app/model/user_model.go (12.9%)</option>
+				
+				<option value="file15">github.com/elsyahtech/gorest-api-starter/app/router/user_router.go (50.0%)</option>
+				
+				<option value="file16">github.com/elsyahtech/gorest-api-starter/app/view/user_view.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package config
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/elsyahtech/gorest"
+)
+
+// AppConfig loads application settings from environment variables and validates the environment.
+func AppConfig() (gorest.Config, error) <span class="cov8" title="1">{
+        cfg := gorest.ConfigDefault
+
+        var err error
+
+        cfg.AppName = str("GOREST_APP_NAME", gorest.DefaultAppName)
+        cfg.Version = str("GOREST_APP_VERSION", "v1.0.0")
+        cfg.Environment = str("GOREST_APP_ENV", gorest.Development)
+
+        if err := validateEnvironment(cfg.Environment); err != nil </span><span class="cov0" title="0">{
+                return gorest.Config{}, fmt.Errorf("%w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Timezone = str("GOREST_APP_TIMEZONE", gorest.DefaultTimezone)
+
+        cfg.Debug, err = strToBool("GOREST_APP_DEBUG", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return gorest.Config{}, fmt.Errorf("failed to parse GOREST_APP_DEBUG: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if value, ok := os.LookupEnv("GOREST_APP_CHECK_FOR_UPDATES"); ok &amp;&amp; value != "" </span><span class="cov8" title="1">{
+                checkForUpdates, err := strToBool("GOREST_APP_CHECK_FOR_UPDATES", true)
+                if err != nil </span><span class="cov0" title="0">{
+                        return gorest.Config{}, fmt.Errorf("failed to parse GOREST_APP_CHECK_FOR_UPDATES: %w", err)
+                }</span>
+
+                <span class="cov8" title="1">cfg.CheckForUpdates = &amp;checkForUpdates</span>
+        }
+
+        <span class="cov8" title="1">return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package config
+
+import (
+        "errors"
+        "fmt"
+        "strings"
+
+        "github.com/elsyahtech/gorest/database"
+)
+
+// DatabaseConfig loads the MySQL connection settings and optional startup tasks.
+func DatabaseConfig() (database.Config, error) <span class="cov8" title="1">{
+        cfg := database.ConfigDefault
+
+        var err error
+
+        cfg.Disable, err = strToBool("GOREST_DB_DISABLE", database.DatabaseDisabled)
+        if err != nil </span><span class="cov0" title="0">{
+                return database.Config{}, fmt.Errorf("failed to parse GOREST_DB_DISABLE: %w", err)
+        }</span>
+
+        // This starter supports MySQL only.
+        <span class="cov8" title="1">cfg.Driver = str("GOREST_DB_DRIVER", database.MYSQL)
+        if !strings.EqualFold(cfg.Driver, database.MYSQL) </span><span class="cov8" title="1">{
+                return database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the MySQL starter", database.MYSQL)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Driver = database.MYSQL
+        cfg.Host = str("GOREST_DB_HOST", database.DefaultDatabaseHost)
+        cfg.Port = str("GOREST_DB_PORT", database.MYSQL_PORT)
+        cfg.Name = str("GOREST_DB_NAME", database.DefaultDatabaseName)
+
+        cfg.Username = str("GOREST_DB_USER", "")
+        if cfg.Username == "" </span><span class="cov8" title="1">{
+                return database.Config{}, errors.New("DB Username cannot be empty")
+        }</span>
+
+        <span class="cov8" title="1">cfg.Password = str("GOREST_DB_PASSWORD", "")
+        if cfg.Password == "" </span><span class="cov0" title="0">{
+                return database.Config{}, errors.New("DB Password cannot be empty")
+        }</span>
+
+        <span class="cov8" title="1">cfg.AllowInsecureProduction, err = strToBool("GOREST_DB_ALLOW_INSECURE_PRODUCTION", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return database.Config{}, fmt.Errorf("failed to parse GOREST_DB_ALLOW_INSECURE_PRODUCTION: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.TLS = str("GOREST_DB_TLS", database.TLSDisabled)
+        cfg.SSLCertPath = str("GOREST_DB_CERT_PATH", "")
+
+        cfg.SSLCAPath = str("GOREST_DB_CA_PATH", "")
+        // MySQL TLS requires a CA path in this starter.
+        if cfg.Driver == database.MYSQL &amp;&amp; cfg.TLS == database.TLSTrue &amp;&amp; cfg.SSLCAPath == "" </span><span class="cov8" title="1">{
+                return database.Config{}, errors.New("GOREST_DB_CA_PATH cannot be empty when MySQL TLS is enabled")
+        }</span>
+
+        <span class="cov8" title="1">cfg.SSLKeyPath = str("GOREST_DB_KEY_PATH", "")
+        cfg.Charset = str("GOREST_DB_CHARSET", database.DefaultCharset)
+        cfg.Timeout = strToTimeDuration("GOREST_DB_TIMEOUT", database.DefaultTimeout)
+        cfg.ConnectionMaxLifetime = strToTimeDuration("GOREST_DB_CONNECTION_MAX_LIFETIME", database.DefaultConnectionMaxLifetime)
+        cfg.MaxOpenConnections = strToInt("GOREST_DB_MAX_OPEN_CONNECTIONS", database.DefaultMaxOpenConnections)
+        cfg.MaxIdleConnections = strToInt("GOREST_DB_MAX_IDLE_CONNECTIONS", database.DefaultMaxIdleConnections)
+
+        cfg.QueryLogging, err = strToBool("GOREST_DB_QUERY_LOGGING", database.DefaultQueryLogging)
+        if err != nil </span><span class="cov0" title="0">{
+                return database.Config{}, fmt.Errorf("failed to parse GOREST_DB_QUERY_LOGGING: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.DatabaseDirectory = str("GOREST_DB_DIRECTORY", database.DefaultDatabaseDirectory)
+
+        cfg.Migration, err = strToBool("GOREST_DB_MIGRATION", database.MigrationDisabled)
+        if err != nil </span><span class="cov0" title="0">{
+                return database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MIGRATION: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Seeder, err = strToBool("GOREST_DB_SEEDER", database.SeederDisabled)
+        if err != nil </span><span class="cov0" title="0">{
+                return database.Config{}, fmt.Errorf("failed to parse GOREST_DB_SEEDER: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.MigrationDirectory = str("GOREST_DB_MIGRATIONS_DIRECTORY", database.DefaultMigrationDirectory)
+        cfg.SeederDirectory = str("GOREST_DB_SEEDERS_DIRECTORY", database.DefaultSeederDirectory)
+
+        return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package config
+
+import (
+        "fmt"
+
+        "github.com/elsyahtech/gorest/filter"
+)
+
+// FilterConfig loads JWT and authentication-cookie settings.
+func FilterConfig() (filter.Config, error) <span class="cov8" title="1">{
+        cfg := filter.ConfigDefault
+
+        var err error
+
+        cfg.SignatureKey = strPtr("GOREST_FILTER_SIGNATURE_KEY", "")
+        cfg.SigningMethod = str("GOREST_FILTER_SIGNING_METHOD", filter.DefaultSigningMethod)
+        cfg.AccessTokenDuration = strToTimeDuration("GOREST_FILTER_ACCESS_TOKEN_DURATION", filter.DefaultAccessTokenDuration)
+        cfg.RefreshTokenDuration = strToTimeDuration("GOREST_FILTER_REFRESH_TOKEN_DURATION", filter.DefaultRefreshTokenDuration)
+        cfg.CookieSameSite = str("GOREST_FILTER_COOKIE_SAME_SITE", filter.DefaultCookieSameSite)
+        cfg.CookieDomain = str("GOREST_FILTER_COOKIE_DOMAIN", filter.DefaultCookieDomain)
+        cfg.CookiePath = str("GOREST_FILTER_COOKIE_PATH", filter.DefaultCookiePath)
+        cfg.CookieMaxAge = strToInt("GOREST_FILTER_COOKIE_MAX_AGE", filter.DefaultCookieMaxAge) //nolint:staticcheck
+
+        cfg.CookieSecure, err = strToBool("GOREST_FILTER_COOKIE_SECURE", filter.DefaultCookieSecure)
+        if err != nil </span><span class="cov0" title="0">{
+                return filter.Config{}, fmt.Errorf("failed to parse GOREST_FILTER_COOKIE_SECURE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.CookieHTTPOnly, err = strToBool("GOREST_FILTER_COOKIE_HTTP_ONLY", filter.DefaultCookieHTTPOnly)
+        if err != nil </span><span class="cov0" title="0">{
+                return filter.Config{}, fmt.Errorf("failed to parse GOREST_FILTER_COOKIE_HTTP_ONLY: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.CookieSessionOnly, err = strToBool("GOREST_FILTER_COOKIE_SESSION_ONLY", filter.DefaultCookieSessionOnly)
+        if err != nil </span><span class="cov0" title="0">{
+                return filter.Config{}, fmt.Errorf("failed to parse GOREST_FILTER_COOKIE_SESSION_ONLY: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package config
+
+import (
+        "crypto/tls"
+        "fmt"
+        "os"
+        "strconv"
+        "strings"
+        "time"
+
+        "github.com/elsyahtech/gorest"
+)
+
+func envString(key string) string <span class="cov8" title="1">{
+        return strings.TrimSpace(os.Getenv(key))
+}</span>
+
+func envDuration(key string) (time.Duration, error) <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return 0, nil
+        }</span>
+
+        <span class="cov8" title="1">duration, err := time.ParseDuration(value)
+        if err != nil </span><span class="cov8" title="1">{
+                return 0, fmt.Errorf("%s must be a valid Go duration: %w", key, err)
+        }</span>
+
+        <span class="cov8" title="1">if duration &lt; 0 </span><span class="cov8" title="1">{
+                return 0, fmt.Errorf("%s cannot be negative", key)
+        }</span>
+
+        <span class="cov8" title="1">return duration, nil</span>
+}
+
+func envNonNegativeInt(key string) (int, error) <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return 0, nil
+        }</span>
+
+        <span class="cov8" title="1">number, err := strconv.Atoi(value)
+        if err != nil || number &lt; 0 </span><span class="cov8" title="1">{
+                return 0, fmt.Errorf("%s must be a non-negative integer", key)
+        }</span>
+
+        <span class="cov8" title="1">return number, nil</span>
+}
+
+func envFileMode(key string) (os.FileMode, error) <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return 0, nil
+        }</span>
+
+        <span class="cov8" title="1">mode, err := strconv.ParseUint(value, 8, 32)
+        if err != nil || mode &gt; 0o777 </span><span class="cov8" title="1">{
+                return 0, fmt.Errorf("%s must be an octal permission mode between 0000 and 0777", key)
+        }</span>
+
+        <span class="cov8" title="1">return os.FileMode(mode), nil</span>
+}
+
+func envTLSMinVersion(key string) (uint16, error) <span class="cov8" title="1">{
+        switch strings.ToLower(envString(key)) </span>{
+        case "":<span class="cov8" title="1">
+                return 0, nil</span>
+        case "1.2", "tls1.2", "tlsv1.2":<span class="cov0" title="0">
+                return tls.VersionTLS12, nil</span>
+        case "1.3", "tls1.3", "tlsv1.3":<span class="cov8" title="1">
+                return tls.VersionTLS13, nil</span>
+        default:<span class="cov8" title="1">
+                return 0, fmt.Errorf("%s must be 1.2 or 1.3", key)</span>
+        }
+}
+
+func str(key, defaultValue string) string <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">return value</span>
+}
+
+func strPtr(key, defaultValue string) *string <span class="cov8" title="1">{
+        value := str(key, defaultValue)
+
+        return &amp;value
+}</span>
+
+func strToInt(key string, defaultValue int) int <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">parsed, err := strconv.Atoi(value)
+        if err != nil </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">return parsed</span>
+}
+
+func strToTimeDuration(key string, defaultValue time.Duration) time.Duration <span class="cov8" title="1">{
+        value := envString(key)
+        if value == "" </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">parsed, err := time.ParseDuration(value)
+        if err != nil </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">return parsed</span>
+}
+
+func toStrArray(key string, defaultValue []string) []string <span class="cov8" title="1">{
+        value, ok := os.LookupEnv(key)
+        if !ok </span><span class="cov8" title="1">{
+                return defaultValue
+        }</span>
+
+        <span class="cov8" title="1">value = strings.TrimSpace(value)
+
+        if value == "" </span><span class="cov8" title="1">{
+                return make([]string, 0)
+        }</span>
+
+        <span class="cov8" title="1">items := strings.Split(value, ",")
+
+        result := make([]string, 0, len(items))
+
+        for _, item := range items </span><span class="cov8" title="1">{
+                if trimmed := strings.TrimSpace(item); trimmed != "" </span><span class="cov8" title="1">{
+                        result = append(result, trimmed)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+func strToBool(key string, defaultValue bool) (bool, error) <span class="cov8" title="1">{
+        value := strings.TrimSpace(os.Getenv(key))
+        if value == "" </span><span class="cov8" title="1">{
+                return defaultValue, nil
+        }</span>
+
+        <span class="cov8" title="1">parsed, err := strconv.ParseBool(value)
+        if err != nil </span><span class="cov8" title="1">{
+                return false, fmt.Errorf("%s must be a boolean: %w", key, err)
+        }</span>
+
+        <span class="cov8" title="1">return parsed, nil</span>
+}
+
+func validateEnvironment(value string) error <span class="cov8" title="1">{
+        switch value </span>{
+        case gorest.Development, gorest.Production, gorest.Testing:<span class="cov8" title="1">
+                return nil</span>
+        default:<span class="cov8" title="1">
+                return fmt.Errorf("GOREST_APP_ENV must be %s, %s, or %s", gorest.Development, gorest.Production, gorest.Testing)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package config
+
+import (
+        "fmt"
+
+        "github.com/elsyahtech/gorest/log"
+)
+
+// LoggerConfig loads log file and rotation settings from environment variables.
+func LoggerConfig() (log.Config, error) <span class="cov8" title="1">{
+        cfg := log.ConfigDefault
+
+        var err error
+
+        cfg.LogDir = str("GOREST_LOG_DIR", log.DefaultLogDir)
+        cfg.LogFile = str("GOREST_LOG_FILE", log.DefaultLogFile)
+
+        cfg.Caller, err = strToBool("GOREST_LOG_CALLER", log.DefaultCaller)
+        if err != nil </span><span class="cov0" title="0">{
+                return log.Config{}, fmt.Errorf("failed to parse GOREST_LOG_CALLER: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.MaxFileSize = strToInt("GOREST_LOG_MAX_FILE_SIZE", log.DefaultMaxFileSize)
+        cfg.MaxBackups = strToInt("GOREST_LOG_MAX_BACKUPS", log.DefaultMaxBackups)
+        cfg.MaxAge = strToInt("GOREST_LOG_MAX_AGE", log.DefaultLogMaxAge)
+
+        return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package config
+
+import (
+        "github.com/elsyahtech/gorest/monitoring"
+)
+
+// MonitoringConfig loads monitoring endpoint and HTTP metrics settings.
+func MonitoringConfig() (monitoring.Config, error) <span class="cov8" title="1">{
+        cfg := monitoring.ConfigDefault
+
+        var err error
+        if cfg.DisableMonitoringEndpoints, err = strToBool("GOREST_MONITORING_DISABLE", false); err != nil </span><span class="cov8" title="1">{
+                return monitoring.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">cfg.MonitoringAllowedIPs = toStrArray("GOREST_MONITORING_ALLOWED_IPS", []string{"127.0.0.1", "::1"})
+
+        if cfg.EnableHTTPMetricsMonitoring, err = strToBool("GOREST_MONITORING_ENABLE_HTTP_METRICS", false); err != nil </span><span class="cov0" title="0">{
+                return monitoring.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package config
+
+import (
+        "errors"
+        "fmt"
+
+        "github.com/elsyahtech/gorest/redis"
+)
+
+// RedisConfig loads optional Redis settings; Redis is disabled by default.
+func RedisConfig() (redis.Config, error) <span class="cov8" title="1">{
+        cfg := redis.ConfigDefault
+
+        var err error
+
+        cfg.Disable, err = strToBool("GOREST_REDIS_DISABLE", true)
+        if err != nil </span><span class="cov0" title="0">{
+                return redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_DISABLE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Database = strToInt("GOREST_REDIS_DATABASE", redis.DefaultRedisDatabase)
+        cfg.Host = str("GOREST_REDIS_HOST", redis.DefaultRedisHost)
+        cfg.Port = str("GOREST_REDIS_PORT", redis.DefaultRedisPort)
+        cfg.Username = str("GOREST_REDIS_USER", "")
+        cfg.Password = str("GOREST_REDIS_PASSWORD", "")
+
+        cfg.TLS, err = strToBool("GOREST_REDIS_TLS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_TLS: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.SSLCertPath = str("GOREST_REDIS_CERT_PATH", "")
+        if cfg.SSLCertPath == "" </span><span class="cov8" title="1">{
+                if cfg.TLS </span><span class="cov0" title="0">{
+                        // This starter requires a certificate path when Redis TLS is enabled.
+                        return redis.Config{}, errors.New("GOREST_REDIS_CERT_PATH cannot be empty when GOREST_REDIS_TLS is true")
+                }</span>
+        }
+
+        <span class="cov8" title="1">cfg.SSLKeyPath = str("GOREST_REDIS_KEY_PATH", "")
+        cfg.SSLCAPath = str("GOREST_REDIS_CA_PATH", "")
+        cfg.Timeout = strToTimeDuration("GOREST_REDIS_TIMEOUT", redis.DefaultRedisTimeout)
+        cfg.PoolTimeout = strToTimeDuration("GOREST_REDIS_POOL_TIMEOUT", redis.DefaultRedisPoolTimeout)
+        cfg.ConnMaxLifetime = strToTimeDuration("GOREST_REDIS_CONN_MAX_LIFETIME", redis.DefaultRedisConnMaxLifetime)
+        cfg.ConnMaxIdleTime = strToTimeDuration("GOREST_REDIS_CONN_MAX_IDLE_TIME", redis.DefaultRedisConnMaxIdleTime)
+
+        cfg.AllowInsecureProduction, err = strToBool("GOREST_REDIS_ALLOW_INSECURE_PRODUCTION", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_ALLOW_INSECURE_PRODUCTION: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.MaxRetries = strToInt("GOREST_REDIS_MAX_RETRIES", redis.DefaultRedisMaxRetries)
+        cfg.PoolSize = strToInt("GOREST_REDIS_POOL_SIZE", redis.DefaultRedisPoolSize)
+        cfg.MinIdleConns = strToInt("GOREST_REDIS_MIN_IDLE_CONNS", redis.DefaultRedisMinIdleConns)
+        cfg.MaxActiveConns = strToInt("GOREST_REDIS_MAX_ACTIVE_CONNS", redis.DefaultRedisMaxActiveConns)
+        cfg.ReadBufferSize = strToInt("GOREST_REDIS_READ_BUFFER_SIZE", redis.DefaultRedisReadBufferSize)
+        cfg.WriteBufferSize = strToInt("GOREST_REDIS_WRITE_BUFFER_SIZE", redis.DefaultRedisWriteBufferSize)
+
+        return cfg, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package config
+
+import (
+        "fmt"
+        "os"
+        "time"
+
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest/server"
+        "github.com/gofiber/fiber/v3"
+        "github.com/gofiber/fiber/v3/middleware/compress"
+        "github.com/gofiber/fiber/v3/middleware/cors"
+        "github.com/gofiber/fiber/v3/middleware/helmet"
+        "github.com/gofiber/fiber/v3/middleware/limiter"
+        "github.com/gofiber/fiber/v3/middleware/recover"
+        "github.com/gofiber/fiber/v3/middleware/requestid"
+)
+
+// ServerConfig loads HTTP server, middleware, and listener settings.
+// Authentication and authorization must be configured separately for protected routes.
+func ServerConfig() (server.Config, error) <span class="cov8" title="1">{
+        cfg := server.ConfigDefault
+
+        cfg.Host = str("GOREST_SERVER_HOST", server.DefaultServerHost)
+        cfg.Port = strToInt("GOREST_SERVER_PORT", server.DefaultServerPort)
+
+        stackTrace, err := strToBool("GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Recover = &amp;recover.Config{
+                EnableStackTrace: stackTrace,
+        }
+
+        cfg.Requestid = &amp;requestid.Config{
+                Header: os.Getenv("GOREST_SERVER_REQUEST_ID_HEADER"),
+        }
+
+        cfg.Compress = &amp;compress.Config{
+                Level: compress.Level(strToInt("GOREST_SERVER_COMPRESS_LEVEL", int(compress.LevelDefault))),
+        }
+
+        cfg.Core, err = fiberCoreConfig()
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, fmt.Errorf("failed to configure fiber core: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">origins := toStrArray("GOREST_SERVER_CORS_ORIGINS", []string{"http://localhost:3000", "http://127.0.0.1:3000"})
+        if len(origins) == 0 </span><span class="cov8" title="1">{
+                origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+        }</span>
+
+        <span class="cov8" title="1">methods := toStrArray("GOREST_SERVER_CORS_METHODS", []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+        if len(methods) == 0 </span><span class="cov8" title="1">{
+                methods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+        }</span>
+
+        <span class="cov8" title="1">headers := toStrArray("GOREST_SERVER_CORS_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"})
+        if len(headers) == 0 </span><span class="cov8" title="1">{
+                headers = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"}
+        }</span>
+
+        <span class="cov8" title="1">allowCredentials, err := strToBool("GOREST_SERVER_CORS_ALLOW_CREDENTIALS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_CORS_ALLOW_CREDENTIALS: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">allowPrivateNetwork, err := strToBool("GOREST_SERVER_CORS_ALLOW_PRIVATE_NETWORK", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_CORS_ALLOW_PRIVATE_NETWORK: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableCORSValueRedaction, err := strToBool("GOREST_SERVER_CORS_DISABLE_VALUE_REDACTION", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_CORS_DISABLE_VALUE_REDACTION: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">cfg.Cors = &amp;cors.Config{
+                AllowOrigins:          origins,
+                AllowMethods:          methods,
+                AllowHeaders:          headers,
+                ExposeHeaders:         toStrArray("GOREST_SERVER_CORS_EXPOSE_HEADERS", make([]string, 0)),
+                MaxAge:                strToInt("GOREST_SERVER_CORS_MAX_AGE", 300),
+                AllowCredentials:      allowCredentials,
+                AllowPrivateNetwork:   allowPrivateNetwork,
+                DisableValueRedaction: disableCORSValueRedaction,
+        }
+
+        hSTSExcludeSubdomains, err := strToBool("GOREST_SERVER_HELMET_HSTS_EXCLUDE_SUBDOMAINS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">cspReportOnly, err := strToBool("GOREST_SERVER_HELMET_CSP_REPORT_ONLY", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">hSTSPreloadEnabled, err := strToBool("GOREST_SERVER_HELMET_HSTS_PRELOAD_ENABLED", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">cfg.Helmet = &amp;helmet.Config{
+                XSSProtection:             os.Getenv("GOREST_SERVER_HELMET_XSS_PROTECTION"),
+                ContentTypeNosniff:        os.Getenv("GOREST_SERVER_HELMET_CONTENT_TYPE_NOSNIFF"),
+                XFrameOptions:             os.Getenv("GOREST_SERVER_HELMET_X_FRAME_OPTIONS"),
+                ContentSecurityPolicy:     os.Getenv("GOREST_SERVER_HELMET_CONTENT_SECURITY_POLICY"),
+                ReferrerPolicy:            os.Getenv("GOREST_SERVER_HELMET_REFERRER_POLICY"),
+                PermissionPolicy:          os.Getenv("GOREST_SERVER_HELMET_PERMISSION_POLICY"),
+                CrossOriginEmbedderPolicy: os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_EMBEDDER_POLICY"),
+                CrossOriginOpenerPolicy:   os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_OPENER_POLICY"),
+                CrossOriginResourcePolicy: os.Getenv("GOREST_SERVER_HELMET_CROSS_ORIGIN_RESOURCE_POLICY"),
+                OriginAgentCluster:        os.Getenv("GOREST_SERVER_HELMET_ORIGIN_AGENT_CLUSTER"),
+                XDNSPrefetchControl:       os.Getenv("GOREST_SERVER_HELMET_X_DNS_PREFETCH_CONTROL"),
+                XDownloadOptions:          os.Getenv("GOREST_SERVER_HELMET_X_DOWNLOAD_OPTIONS"),
+                XPermittedCrossDomain:     os.Getenv("GOREST_SERVER_HELMET_X_PERMITTED_CROSS_DOMAIN"),
+                HSTSMaxAge:                strToInt("GOREST_SERVER_HELMET_HSTS_MAX_AGE", 0),
+                HSTSExcludeSubdomains:     hSTSExcludeSubdomains,
+                CSPReportOnly:             cspReportOnly,
+                HSTSPreloadEnabled:        hSTSPreloadEnabled,
+        }
+
+        skipFailedRequests, err := strToBool("GOREST_SERVER_RATE_LIMIT_SKIP_FAILED_REQUESTS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">skipSuccessfulRequests, err := strToBool("GOREST_SERVER_RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">disableHeaders, err := strToBool("GOREST_SERVER_RATE_LIMIT_DISABLE_HEADERS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">disableValueRedaction, err := strToBool("GOREST_SERVER_RATE_LIMIT_DISABLE_VALUE_REDACTION", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">cfg.Limiter = &amp;limiter.Config{
+                Max:                    strToInt("GOREST_SERVER_RATE_LIMIT_MAX", 50),
+                Expiration:             strToTimeDuration("GOREST_SERVER_RATE_LIMIT_EXPIRATION", time.Minute),
+                SkipFailedRequests:     skipFailedRequests,
+                SkipSuccessfulRequests: skipSuccessfulRequests,
+                DisableHeaders:         disableHeaders,
+                DisableValueRedaction:  disableValueRedaction,
+        }
+
+        listener, err := loadServerListenerConfig()
+        if err != nil </span><span class="cov8" title="1">{
+                return server.Config{}, err
+        }</span>
+
+        <span class="cov8" title="1">cfg.Listener = listener
+
+        return cfg, nil</span>
+}
+
+func fiberCoreConfig() (*fiber.Config, error) <span class="cov8" title="1">{
+        strictRouting, err := strToBool("GOREST_SERVER_STRICT_ROUTING", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_STRICT_ROUTING: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">caseSensitive, err := strToBool("GOREST_SERVER_CASE_SENSITIVE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_CASE_SENSITIVE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">skipUnmatchedRoutes, err := strToBool("GOREST_SERVER_SKIP_UNMATCHED_ROUTES", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_SKIP_UNMATCHED_ROUTES: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableHeadAutoRegister, err := strToBool("GOREST_SERVER_DISABLE_HEAD_AUTO_REGISTER", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_HEAD_AUTO_REGISTER: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableFlashMessages, err := strToBool("GOREST_SERVER_DISABLE_FLASH_MESSAGES", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_FLASH_MESSAGES: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">immutable, err := strToBool("GOREST_SERVER_IMMUTABLE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_IMMUTABLE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">unescapePath, err := strToBool("GOREST_SERVER_UNESCAPE_PATH", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_UNESCAPE_PATH: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">passLocalsToViews, err := strToBool("GOREST_SERVER_PASS_LOCALS_TO_VIEWS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_PASS_LOCALS_TO_VIEWS: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">passLocalsToContext, err := strToBool("GOREST_SERVER_PASS_LOCALS_TO_CONTEXT", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_PASS_LOCALS_TO_CONTEXT: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">getOnly, err := strToBool("GOREST_SERVER_GET_ONLY", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_GET_ONLY: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableKeepalive, err := strToBool("GOREST_SERVER_DISABLE_KEEPALIVE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_KEEPALIVE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableDefaultDate, err := strToBool("GOREST_SERVER_DISABLE_DEFAULT_DATE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_DEFAULT_DATE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableDefaultContentType, err := strToBool("GOREST_SERVER_DISABLE_DEFAULT_CONTENT_TYPE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_DEFAULT_CONTENT_TYPE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disableHeaderNormalizing, err := strToBool("GOREST_SERVER_DISABLE_HEADER_NORMALIZING", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_HEADER_NORMALIZING: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">streamRequestBody, err := strToBool("GOREST_SERVER_STREAM_REQUEST_BODY", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_STREAM_REQUEST_BODY: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">disablePreParseMultipartForm, err := strToBool("GOREST_SERVER_DISABLE_PRE_PARSE_MULTIPART_FORM", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_DISABLE_PRE_PARSE_MULTIPART_FORM: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">reduceMemoryUsage, err := strToBool("GOREST_SERVER_REDUCE_MEMORY_USAGE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_REDUCE_MEMORY_USAGE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">trustProxy, err := strToBool("GOREST_SERVER_TRUST_PROXY", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_TRUST_PROXY: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">linkLocal, err := strToBool("GOREST_SERVER_TRUST_PROXY_LINK_LOCAL", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_TRUST_PROXY_LINK_LOCAL: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">loopback, err := strToBool("GOREST_SERVER_TRUST_PROXY_LOOPBACK", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_TRUST_PROXY_LOOPBACK: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">private, err := strToBool("GOREST_SERVER_TRUST_PROXY_PRIVATE", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_TRUST_PROXY_PRIVATE: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">unixSocket, err := strToBool("GOREST_SERVER_TRUST_PROXY_UNIX_SOCKET", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_TRUST_PROXY_UNIX_SOCKET: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">enableIPValidation, err := strToBool("GOREST_SERVER_ENABLE_IP_VALIDATION", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_ENABLE_IP_VALIDATION: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">enableSplittingOnParsers, err := strToBool("GOREST_SERVER_ENABLE_SPLITTING_ON_PARSERS", false)
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;fiber.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_ENABLE_SPLITTING_ON_PARSERS: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;fiber.Config{
+                ServerHeader:                 os.Getenv("GOREST_SERVER_HEADER"),
+                StrictRouting:                strictRouting,
+                CaseSensitive:                caseSensitive,
+                SkipUnmatchedRoutes:          skipUnmatchedRoutes,
+                DisableHeadAutoRegister:      disableHeadAutoRegister,
+                DisableFlashMessages:         disableFlashMessages,
+                Immutable:                    immutable,
+                UnescapePath:                 unescapePath,
+                BodyLimit:                    strToInt("GOREST_SERVER_BODY_LIMIT", server.DefaultServerBodyLimit),
+                MaxRanges:                    strToInt("GOREST_SERVER_MAX_RANGES", fiber.DefaultMaxRanges),
+                Concurrency:                  strToInt("GOREST_SERVER_CONCURRENCY", fiber.DefaultConcurrency),
+                ViewsLayout:                  os.Getenv("GOREST_SERVER_VIEWS_LAYOUT"),
+                PassLocalsToViews:            passLocalsToViews,
+                PassLocalsToContext:          passLocalsToContext,
+                ReadTimeout:                  strToTimeDuration("GOREST_SERVER_READ_TIMEOUT", server.DefaultServerReadTimeout),
+                WriteTimeout:                 strToTimeDuration("GOREST_SERVER_WRITE_TIMEOUT", server.DefaultServerWriteTimeout),
+                IdleTimeout:                  strToTimeDuration("GOREST_SERVER_IDLE_TIMEOUT", server.DefaultServerIdleTimeout),
+                ReadBufferSize:               strToInt("GOREST_SERVER_READ_BUFFER_SIZE", fiber.DefaultReadBufferSize),
+                WriteBufferSize:              strToInt("GOREST_SERVER_WRITE_BUFFER_SIZE", fiber.DefaultWriteBufferSize),
+                ProxyHeader:                  os.Getenv("GOREST_SERVER_PROXY_HEADER"),
+                GETOnly:                      getOnly,
+                DisableKeepalive:             disableKeepalive,
+                DisableDefaultDate:           disableDefaultDate,
+                DisableDefaultContentType:    disableDefaultContentType,
+                DisableHeaderNormalizing:     disableHeaderNormalizing,
+                AppName:                      str("GOREST_APP_NAME", gorest.DefaultAppName),
+                SharedStatePrefix:            os.Getenv("GOREST_SERVER_SHARED_STATE_PREFIX"),
+                StreamRequestBody:            streamRequestBody,
+                DisablePreParseMultipartForm: disablePreParseMultipartForm,
+                ReduceMemoryUsage:            reduceMemoryUsage,
+                TrustProxy:                   trustProxy,
+                TrustProxyConfig: fiber.TrustProxyConfig{
+                        Proxies:    toStrArray("GOREST_SERVER_TRUST_PROXY_PROXIES", make([]string, 0)),
+                        LinkLocal:  linkLocal,
+                        Loopback:   loopback,
+                        Private:    private,
+                        UnixSocket: unixSocket,
+                },
+                EnableIPValidation:       enableIPValidation,
+                RequestMethods:           toStrArray("GOREST_SERVER_REQUEST_METHODS", make([]string, 0)),
+                EnableSplittingOnParsers: enableSplittingOnParsers,
+        }, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package config
+
+import (
+        "github.com/elsyahtech/gorest/server"
+)
+
+func loadServerListenerConfig() (server.ListenerConfig, error) <span class="cov8" title="1">{
+        listener := server.ListenerConfig{
+                Network:           envString("GOREST_SERVER_LISTENER_NETWORK"),
+                TLSCertFile:       envString("GOREST_SERVER_CERT_FILE"),
+                TLSCertKeyFile:    envString("GOREST_SERVER_CERT_KEY_FILE"),
+                TLSCertClientFile: envString("GOREST_SERVER_CERT_CLIENT_FILE"),
+                UnixSocketPath:    envString("GOREST_SERVER_UNIX_SOCKET_PATH"),
+        }
+
+        var err error
+
+        if listener.PreforkRecoverInterval, err = envDuration("GOREST_SERVER_PREFORK_RECOVER_INTERVAL"); err != nil </span><span class="cov0" title="0">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.ShutdownTimeout, err = envDuration("GOREST_SERVER_SHUTDOWN_TIMEOUT"); err != nil </span><span class="cov8" title="1">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.PreforkShutdownGracePeriod, err = envDuration("GOREST_SERVER_PREFORK_SHUTDOWN_GRACE_PERIOD"); err != nil </span><span class="cov0" title="0">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.PreforkRecoverThreshold, err = envNonNegativeInt("GOREST_SERVER_PREFORK_RECOVER_THRESHOLD"); err != nil </span><span class="cov8" title="1">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.UnixSocketFileMode, err = envFileMode("GOREST_SERVER_UNIX_SOCKET_FILE_MODE"); err != nil </span><span class="cov8" title="1">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.TLSMinVersion, err = envTLSMinVersion("GOREST_SERVER_TLS_MIN_VERSION"); err != nil </span><span class="cov8" title="1">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.EnablePrefork, err = strToBool("GOREST_SERVER_ENABLE_PREFORK", false); err != nil </span><span class="cov8" title="1">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">if listener.EnablePrintRoutes, err = strToBool("GOREST_SERVER_ENABLE_PRINT_ROUTES", false); err != nil </span><span class="cov0" title="0">{
+                return server.ListenerConfig{}, err
+        }</span>
+
+        <span class="cov8" title="1">return listener, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package handler
+
+import (
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+        "github.com/elsyahtech/gorest/view"
+)
+
+// UserHandler handles HTTP requests for user resources.
+type UserHandler struct {
+        App         *gorest.App
+        UserLibrary UserUseCase
+        JSON        *view.JSON
+}
+
+type UserUseCase interface {
+        Login(*gorest.Context, *entity.User) (string, int, error)
+        CreateUser(*entity.User) (string, int, error)
+        GetUsers() (*[]entity.User, string, int, error)
+}
+
+// NewUserHandler creates a handler connected to the application and user library.
+func NewUserHandler(app *gorest.App, lib UserUseCase) *UserHandler <span class="cov8" title="1">{
+        return &amp;UserHandler{
+                App:         app,
+                UserLibrary: lib,
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package handler
+
+import (
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+        resview "github.com/elsyahtech/gorest-api-starter/app/view"
+        "github.com/elsyahtech/gorest/helper"
+)
+
+func (hndlr *UserHandler) Login(ctx *gorest.Context) error <span class="cov8" title="1">{
+        response := hndlr.JSON.NewResponse(gorest.Map{
+                "developer": "Elmansyah",
+                "contact":   "https://www.linkedin.com/in/elmansyah",
+                "version":   "v1",
+        })
+
+        var request entity.User
+
+        message, httpCode, err := helper.BodyRequest(ctx, &amp;request)
+        if err != nil </span><span class="cov0" title="0">{
+                response.WithMessage(message, err, httpCode)
+
+                hndlr.App.Log(gorest.Map{
+                        "error": err,
+                }).Error(message)
+
+                return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+        }</span>
+
+        <span class="cov8" title="1">message, httpCode, err = hndlr.UserLibrary.Login(ctx, &amp;request)
+        if err != nil </span><span class="cov0" title="0">{
+                response.WithMessage(message, err, httpCode)
+
+                hndlr.App.Log(gorest.Map{
+                        "error": err,
+                }).Error(message)
+
+                return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+        }</span>
+
+        <span class="cov8" title="1">response.WithMessage("Login successful", nil, httpCode)
+
+        return response.SendJSON(ctx, response, nil)</span> //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+}
+
+// CreateUser handles a request to create a user through the ORM.
+func (handler *UserHandler) CreateUser(ctx *gorest.Context) error <span class="cov8" title="1">{
+        response := handler.JSON.NewResponse(gorest.Map{
+                "developer": "Elmansyah",
+                "contact":   "https://www.linkedin.com/in/elmansyah",
+                "version":   "v1",
+        })
+
+        var request entity.User
+
+        message, httpCode, err := helper.BodyRequest(ctx, &amp;request)
+        if err != nil </span><span class="cov0" title="0">{
+                response.WithMessage(message, err, httpCode)
+
+                handler.App.Log(gorest.Map{
+                        "error": err,
+                }).Error(message)
+
+                return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+        }</span>
+
+        <span class="cov8" title="1">message, httpCode, err = handler.UserLibrary.CreateUser(&amp;request)
+        if err != nil </span><span class="cov0" title="0">{
+                response.WithMessage(message, err, httpCode)
+
+                handler.App.Log(gorest.Map{
+                        "error": err,
+                }).Error(message)
+
+                return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+        }</span>
+
+        <span class="cov8" title="1">response.WithMessage(message, nil, httpCode)
+
+        return response.SendJSON(ctx, response, nil)</span> //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+}
+
+func (handler *UserHandler) GetUsers(ctx *gorest.Context) error <span class="cov8" title="1">{
+        response := handler.JSON.NewResponse(gorest.Map{
+                "developer": "Elmansyah",
+                "contact":   "https://www.linkedin.com/in/elmansyah",
+                "version":   "v1",
+        })
+
+        data, message, httpCode, err := handler.UserLibrary.GetUsers()
+        if err != nil </span><span class="cov0" title="0">{
+                response.WithMessage(message, err, httpCode)
+
+                handler.App.Log(gorest.Map{
+                        "error": err,
+                }).Error(message)
+
+                return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+        }</span>
+
+        <span class="cov8" title="1">response.Data = resview.BuildUserResponseArray(data)
+
+        response.WithMessage(message, nil, httpCode)
+
+        return response.SendJSON(ctx, response, nil)</span> //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package library
+
+import (
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+)
+
+// UserLibrary contains user-related application logic.
+type UserLibrary struct {
+        App       *gorest.App
+        UserModel UserRepository
+}
+
+// NewUserLibrary creates a user library backed by the given model.
+func NewUserLibrary(app *gorest.App, userModel UserRepository) *UserLibrary <span class="cov8" title="1">{
+        return &amp;UserLibrary{
+                App:       app,
+                UserModel: userModel,
+        }
+}</span>
+
+type UserRepository interface {
+        CreateUser(*entity.User) (string, int, error)
+        GetUserByEmail(string) (*entity.User, string, int, error)
+        GetUsers() (*[]entity.User, string, int, error)
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package library
+
+import (
+        "errors"
+        "fmt"
+        "net/http"
+
+        "github.com/google/uuid"
+
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+        "github.com/elsyahtech/gorest/helper"
+)
+
+func (lib *UserLibrary) Login(ctx *gorest.Context, req *entity.User) (string, int, error) <span class="cov8" title="1">{
+        if req == nil </span><span class="cov8" title="1">{
+                return "User payload must not be empty", http.StatusBadRequest,
+                        errors.New("add user: request is empty")
+        }</span>
+
+        // Get user by email from the database.
+        <span class="cov8" title="1">user, message, httpCode, err := lib.UserModel.GetUserByEmail(req.Email)
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("get user by email: %w", err)
+        }</span>
+
+        // Validate the password using Argon2 hashing algorithm.
+        <span class="cov8" title="1">passwordMatch, message, httpCode, err := helper.VerifyArgon(req.Password, user.Password)
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("verify password: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if !passwordMatch </span><span class="cov8" title="1">{
+                return "", http.StatusUnauthorized, errors.New("ensure you have entered the correct email and password")
+        }</span>
+
+        // Generate a unique token ID for the user using uuid.
+        // TokenID also can be used from user.ID.
+        // Can be adjustable based on your application needs.
+        <span class="cov0" title="0">tokenID := uuid.New().String() // Generate a unique token ID for the user.
+
+        // Generate token authentication and store it in cookies.
+        message, httpCode, err = lib.App.Filter().CreateToken(*ctx, tokenID)
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("create token: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return message, httpCode, nil</span>
+}
+
+func (lib *UserLibrary) CreateUser(req *entity.User) (string, int, error) <span class="cov8" title="1">{
+        if req == nil </span><span class="cov8" title="1">{
+                return "User payload must not be empty", http.StatusBadRequest,
+                        errors.New("add user: request is empty")
+        }</span>
+
+        <span class="cov8" title="1">passwordHashed, message, httpCode, err := helper.GenerateArgon(req.Password)
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("%w", err)
+        }</span>
+
+        <span class="cov8" title="1">req.Password = passwordHashed
+
+        message, httpCode, err = lib.UserModel.CreateUser(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("%w", err)
+        }</span>
+
+        <span class="cov8" title="1">return message, httpCode, nil</span>
+}
+
+func (lib *UserLibrary) GetUsers() (*[]entity.User, string, int, error) <span class="cov8" title="1">{
+        result, message, httpCode, err := lib.UserModel.GetUsers()
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, message, httpCode, fmt.Errorf("%w", err)
+        }</span>
+
+        <span class="cov8" title="1">return result, message, httpCode, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package model
+
+import "github.com/elsyahtech/gorest"
+
+// UserModel provides database operations for users.
+type UserModel struct {
+        App *gorest.App
+}
+
+// NewUserModel creates a user model backed by the given application.
+func NewUserModel(app *gorest.App) *UserModel <span class="cov0" title="0">{
+        return &amp;UserModel{
+                App: app,
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">package model
+
+import (
+        "errors"
+        "fmt"
+        "net/http"
+        "time"
+
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+)
+
+func (model *UserModel) CreateUser(req *entity.User) (string, int, error) <span class="cov8" title="1">{
+        if req == nil </span><span class="cov8" title="1">{
+                return "User payload must not be empty", http.StatusBadRequest,
+                        errors.New("add user: payload is empty")
+        }</span>
+
+        <span class="cov0" title="0">database := model.App.Database()
+
+        transaction, message, httpCode, err := database.BeginTx()
+        if err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("%w", err)
+        }</span>
+
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if message, _, err := transaction.Rollback(); err != nil </span><span class="cov0" title="0">{
+                        model.App.Log(gorest.Map{"error": err}).Error(message)
+                }</span>
+        }()
+
+        <span class="cov0" title="0">timeNow := time.Now()
+
+        req.CreatedAt = timeNow
+
+        query := transaction.Table("users").Create(req)
+        if query.Error != nil </span><span class="cov0" title="0">{
+                return query.Message, query.HTTPCode, fmt.Errorf("%w", query.Error)
+        }</span>
+
+        <span class="cov0" title="0">if message, httpCode, err = transaction.Commit(); err != nil </span><span class="cov0" title="0">{
+                return message, httpCode, fmt.Errorf("commit transaction failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return query.Message, query.HTTPCode, nil</span>
+}
+
+func (model *UserModel) GetUserByEmail(email string) (*entity.User, string, int, error) <span class="cov8" title="1">{
+        if email == "" </span><span class="cov8" title="1">{
+                return nil, "Email param must not be empty", http.StatusBadRequest,
+                        errors.New("get user by email: email is empty")
+        }</span>
+
+        <span class="cov0" title="0">database := model.App.Database()
+
+        var user entity.User
+
+        query := database.Table("users").
+                Select("*").
+                Where("users.email = ? AND users.is_active = ?", email, true).
+                Find(&amp;user)
+        if query.Error != nil </span><span class="cov0" title="0">{
+                return nil, query.Message, query.HTTPCode, fmt.Errorf("%w", query.Error)
+        }</span>
+
+        <span class="cov0" title="0">return &amp;user, query.Message, query.HTTPCode, nil</span>
+}
+
+func (model *UserModel) GetUsers() (*[]entity.User, string, int, error) <span class="cov0" title="0">{
+        database := model.App.Database()
+
+        var users []entity.User
+
+        query := database.Table("users").Find(&amp;users)
+        if query.Error != nil </span><span class="cov0" title="0">{
+                return nil, query.Message, query.HTTPCode, fmt.Errorf("%w", query.Error)
+        }</span>
+
+        <span class="cov0" title="0">return &amp;users, query.Message, query.HTTPCode, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package router
+
+import (
+        "github.com/elsyahtech/gorest"
+        "github.com/elsyahtech/gorest-api-starter/app/handler"
+        "github.com/elsyahtech/gorest-api-starter/app/library"
+        "github.com/elsyahtech/gorest-api-starter/app/model"
+        "github.com/elsyahtech/gorest/server"
+)
+
+// UserRouter wires the user API layers and registers routes under /users.
+func UserRouter(app *gorest.App) <span class="cov0" title="0">{
+        mdl := model.NewUserModel(app)
+        lib := library.NewUserLibrary(app, mdl)
+        hndlr := handler.NewUserHandler(app, lib)
+        RegisterUserRoutes(app, app.Group("/users"), hndlr)
+}</span>
+
+// RegisterUserRoutes registers user endpoints on a route group.
+func RegisterUserRoutes(app *gorest.App, group *server.Server, hndlr *handler.UserHandler) <span class="cov8" title="1">{
+        authentication := app.Filter().Authentication()
+
+        group.Get("/", authentication, hndlr.GetUsers)
+        group.Post("/create", hndlr.CreateUser)
+        group.Post("/login", hndlr.Login)
+}</span>
+</pre>
+		
+		<pre class="file" id="file16" style="display: none">package view
+
+import (
+        "github.com/elsyahtech/gorest-api-starter/app/entity"
+        "github.com/elsyahtech/gorest/helper"
+)
+
+// BuildUserResponse converts a user into its JSON response DTO.
+func BuildUserResponse(response *entity.User) *entity.UserResponse <span class="cov8" title="1">{
+        if response == nil </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">return &amp;entity.UserResponse{
+                ID:        response.ID,
+                Email:     response.Email,
+                IsActive:  response.IsActive,
+                CreatedAt: helper.ConvertTimeToString(response.CreatedAt),
+                UpdatedAt: helper.ConvertTimePointerToStringPointer(response.UpdatedAt),
+                DeletedAt: helper.ConvertTimePointerToStringPointer(response.DeletedAt),
+        }</span>
+}
+
+// BuildUserResponseArray converts users into response DTOs.
+// It returns an empty array when responses is nil or empty.
+func BuildUserResponseArray(responses *[]entity.User) *[]entity.UserResponse <span class="cov8" title="1">{
+        if responses == nil || len(*responses) == 0 </span><span class="cov8" title="1">{
+                users := make([]entity.UserResponse, 0)
+
+                return &amp;users
+        }</span>
+
+        <span class="cov8" title="1">res := make([]entity.UserResponse, 0, len(*responses))
+
+        for _, item := range *responses </span><span class="cov8" title="1">{
+                res = append(res, *BuildUserResponse(&amp;item))
+        }</span>
+
+        <span class="cov8" title="1">return &amp;res</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -396,6 +396,22 @@ func TestLoadDatabaseProductionConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts MySQL TLS without a CA path", func(t *testing.T) {
+		setValidProductionEnvironment(t)
+		t.Setenv("GOREST_DB_DRIVER", "mysql")
+		t.Setenv("GOREST_DB_TLS", "true")
+		t.Setenv("GOREST_DB_SSL_CA_PATH", "")
+
+		cfg, err := LoadDatabase()
+		if err != nil {
+			t.Fatalf("LoadDatabase() with MySQL TLS and no CA path error = %v", err)
+		}
+		if cfg.TLS != "true" || cfg.SSLCAPath != "" {
+			t.Errorf("MySQL TLS configuration = (TLS:%q, CA:%q), want TLS enabled without a CA path",
+				cfg.TLS, cfg.SSLCAPath)
+		}
+	})
+
 	t.Run("allows insecure connections when explicitly enabled outside production", func(t *testing.T) {
 		isolateConfigurationEnvironment(t)
 		t.Setenv("APP_ENV", gorest.Testing)

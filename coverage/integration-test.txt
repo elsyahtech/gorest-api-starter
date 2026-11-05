@@ -1,0 +1,22 @@
+=== RUN   TestLoadMySQLTestConfigAllowsTLSWithoutCAPath
+--- PASS: TestLoadMySQLTestConfigAllowsTLSWithoutCAPath (0.00s)
+=== RUN   TestMySQLUserEndpointsOverHTTP
+=== RUN   TestMySQLUserEndpointsOverHTTP/rejects_malformed_create_request
+=== RUN   TestMySQLUserEndpointsOverHTTP/rejects_missing_required_user_fields
+=== RUN   TestMySQLUserEndpointsOverHTTP/creates_a_MySQL_user
+=== RUN   TestMySQLUserEndpointsOverHTTP/rejects_duplicate_user_records
+=== RUN   TestMySQLUserEndpointsOverHTTP/rejects_incorrect_password
+=== RUN   TestMySQLUserEndpointsOverHTTP/logs_in_and_issues_an_access_cookie
+=== RUN   TestMySQLUserEndpointsOverHTTP/requires_authentication_to_list_users
+=== RUN   TestMySQLUserEndpointsOverHTTP/lists_users_without_exposing_password_hashes
+--- PASS: TestMySQLUserEndpointsOverHTTP (17.75s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/rejects_malformed_create_request (0.00s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/rejects_missing_required_user_fields (0.00s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/creates_a_MySQL_user (0.76s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/rejects_duplicate_user_records (0.47s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/rejects_incorrect_password (0.13s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/logs_in_and_issues_an_access_cookie (0.12s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/requires_authentication_to_list_users (0.00s)
+    --- PASS: TestMySQLUserEndpointsOverHTTP/lists_users_without_exposing_password_hashes (0.04s)
+PASS
+ok  	github.com/elsyahtech/gorest-api-starter/integration-test	17.826s

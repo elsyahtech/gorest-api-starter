@@ -22,7 +22,7 @@ Set `GOREST_SERVER_HOST` and `GOREST_SERVER_PORT` for deployments. Both are requ
 
 ### Listener configuration
 
-The starter maps the following optional environment variables to GOREST v1.1.17's `server.Config.Listener`. Leave a value empty to use GOREST's default; these deployment options are independent of the HTTP middleware settings above.
+The starter maps the following optional environment variables to GOREST's `server.Config.Listener`. Leave a value empty to use GOREST's default; these deployment options are independent of the HTTP middleware settings above.
 
 | Variable | Purpose | Empty-value default |
 |---|---|---|
@@ -72,7 +72,7 @@ For deployments with health checks running on a trusted non-loopback address, ad
 export GOREST_HTTP_METRICS_ALLOWED_IPS=127.0.0.1/32,::1/128
 ```
 
-Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration completely. Set `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS=true` only when route-level breakdowns from `/gorest/http` are needed; it adds per-request processing and memory use. `/gorest/storage` is an estimate of database storage, not free filesystem capacity or maximum disk size. For filesystem capacity, use operating-system or infrastructure monitoring. See the [GOREST v1.1.17 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.17/docs/configuration.md#operational-endpoints-and-environment-configuration).
+Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration completely. Set `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS=true` only when route-level breakdowns from `/gorest/http` are needed; it adds per-request processing and memory use. `/gorest/storage` is an estimate of database storage, not free filesystem capacity or maximum disk size. For filesystem capacity, use operating-system or infrastructure monitoring. See the [GOREST configuration guide](https://github.com/elsyahtech/gorest/blob/main/docs/configuration.md#operational-endpoints-and-environment-configuration).
 
 ## Database and Redis
 
@@ -125,7 +125,7 @@ dbConfig.TLS = "disable"
 dbConfig.AllowInsecureProduction = true
 ```
 
-Invalid boolean values cause configuration loading to fail. See the [testing guide](./testing.md#non-tls-connections-in-local-database-tests) for how this project uses the test-only exception, and the [GOREST v1.1.17 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.17/docs/configuration.md) for framework details.
+Invalid boolean values cause configuration loading to fail. See the [testing guide](./testing.md#non-tls-connections-in-local-database-tests) for how this project uses the test-only exception, and the [GOREST configuration guide](https://github.com/elsyahtech/gorest/blob/main/docs/configuration.md) for framework details.
 
 ## Logging
 

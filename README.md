@@ -2,7 +2,7 @@
 
 A ready-to-run application starter built with the [GOREST framework](https://github.com/elsyahtech/gorest). Use it to start an application with GOREST already wired, learn the framework through working examples, and adapt the structure and configuration to your own service. It includes layered CRUD routes, ORM and driver-specific native query examples, migrations, seeders, authentication examples, and tests.
 
-This repository supports adoption of GOREST by providing a complete, modifiable application around the framework. The starter documentation explains this repository's choices; for framework APIs and guarantees, use the matching [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs). Adapt and secure the examples for your business requirements before exposing a service.
+This repository supports adoption of GOREST by providing a complete, modifiable application around the framework. The starter documentation explains this repository's choices; for framework APIs and guarantees, see the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs). Adapt and secure the examples for your business requirements before exposing a service.
 
 ## Documentation
 
@@ -16,7 +16,7 @@ Start with the [documentation index](./docs/README.md). The guides are ordered a
 6. [Adding features](./docs/extending.md) — a step-by-step guide to extend the starter consistently.
 7. [Testing and E2E coverage](./docs/testing.md) — run the suite, generate coverage, and verify the seven database drivers.
 
-These guides show how this starter uses GOREST; they do not replace the framework reference. For GOREST framework APIs and behavior matching this starter's dependency, see the [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs).
+These guides show how this starter uses GOREST; they do not replace the framework reference. For framework APIs and behavior, see the [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs).
 
 For vulnerability reporting and the project's security policy, see [SECURITY.md](./SECURITY.md).
 
