@@ -38,13 +38,12 @@ The application loads `.env` when present and also supports environment-only sta
 make unit-test       # isolated unit tests; no database required
 make coverage        # unit coverage profile, text summary, and HTML report
 make test-integration # E2E requests against the explicitly configured MySQL test host
-make integration-report # save a human-readable E2E run report
-make integration-json  # save a machine-readable E2E run report
+make integration-reports # one E2E run: readable and JSON reports plus app coverage
 ```
 
-Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. They do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
+Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. The optional Redis integration test uses the `GOREST_REDIS_*` settings only when Redis is explicitly enabled; point these at a non-production test instance. Tests do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
 
-The coverage outputs and integration reports are generated locally under `coverage/`; rerun the documented commands to regenerate evidence for the current source and environment.
+The coverage outputs and integration reports are generated locally under `coverage/`; rerun the documented commands to regenerate evidence for the current source and environment. The integration report command runs E2E once and generates both report formats and an application coverage profile.
 
 GitHub Actions runs unit tests and coverage on pushes and pull requests. Its MySQL E2E job runs when the required external test database secrets are configured; see the [testing guide](./docs/testing.md#github-actions-ci).
 

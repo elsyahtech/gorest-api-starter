@@ -139,10 +139,174 @@ jobs:
 
           echo "SSL_CERT_FILE=$trust_bundle" >> "$GITHUB_ENV"
 
-      - name: Run MySQL HTTP integration tests
+      - name: Configure optional MySQL mTLS test
+        shell: bash
+        env:
+          MTLS_HOST: ${{ secrets.GOREST_TEST_MYSQL_MTLS_HOST }}
+          MTLS_PORT: ${{ secrets.GOREST_TEST_MYSQL_MTLS_PORT }}
+          MTLS_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_MTLS_DATABASE }}
+          MTLS_USER: ${{ secrets.GOREST_TEST_MYSQL_MTLS_USER }}
+          MTLS_PASSWORD: ${{ secrets.GOREST_TEST_MYSQL_MTLS_PASSWORD }}
+          MTLS_CA_PEM: ${{ secrets.GOREST_TEST_MYSQL_MTLS_CA_PEM }}
+          MTLS_CLIENT_CERT_PEM: ${{ secrets.GOREST_TEST_MYSQL_MTLS_CLIENT_CERT_PEM }}
+          MTLS_CLIENT_KEY_PEM: ${{ secrets.GOREST_TEST_MYSQL_MTLS_CLIENT_KEY_PEM }}
         run: |
-          make integration-report
-          make integration-json
+          set -euo pipefail
+
+          if [[ -z "$MTLS_HOST" ]]; then
+            if [[ -n "$MTLS_PORT$MTLS_DATABASE$MTLS_USER$MTLS_PASSWORD$MTLS_CA_PEM$MTLS_CLIENT_CERT_PEM$MTLS_CLIENT_KEY_PEM" ]]; then
+              echo "MySQL mTLS secrets are incomplete: configure the host or remove the partial configuration."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ -z "$MTLS_DATABASE" || -z "$MTLS_USER" || -z "$MTLS_PASSWORD" || -z "$MTLS_CA_PEM" || -z "$MTLS_CLIENT_CERT_PEM" || -z "$MTLS_CLIENT_KEY_PEM" ]]; then
+            echo "MySQL mTLS is enabled but one or more required secrets are empty."
+            exit 1
+          fi
+
+          if [[ "$MTLS_HOST$MTLS_PORT$MTLS_DATABASE$MTLS_USER$MTLS_PASSWORD" == *$'\n'* ]]; then
+            echo "MySQL mTLS connection settings must not contain newline characters."
+            exit 1
+          fi
+
+          umask 077
+          ca_file="$RUNNER_TEMP/gorest-mysql-mtls-ca.pem"
+          cert_file="$RUNNER_TEMP/gorest-mysql-mtls-client-cert.pem"
+          key_file="$RUNNER_TEMP/gorest-mysql-mtls-client-key.pem"
+          printf '%s\n' "$MTLS_CA_PEM" > "$ca_file"
+          printf '%s\n' "$MTLS_CLIENT_CERT_PEM" > "$cert_file"
+          printf '%s\n' "$MTLS_CLIENT_KEY_PEM" > "$key_file"
+
+          {
+            printf 'GOREST_TEST_MYSQL_MTLS_HOST=%s\n' "$MTLS_HOST"
+            printf 'GOREST_TEST_MYSQL_MTLS_PORT=%s\n' "${MTLS_PORT:-3306}"
+            printf 'GOREST_TEST_MYSQL_MTLS_DATABASE=%s\n' "$MTLS_DATABASE"
+            printf 'GOREST_TEST_MYSQL_MTLS_USER=%s\n' "$MTLS_USER"
+            printf 'GOREST_TEST_MYSQL_MTLS_PASSWORD=%s\n' "$MTLS_PASSWORD"
+            printf 'GOREST_TEST_MYSQL_MTLS_TLS=true\n'
+            printf 'GOREST_TEST_MYSQL_MTLS_CA_FILE=%s\n' "$ca_file"
+            printf 'GOREST_TEST_MYSQL_MTLS_CLIENT_CERT_FILE=%s\n' "$cert_file"
+            printf 'GOREST_TEST_MYSQL_MTLS_CLIENT_KEY_FILE=%s\n' "$key_file"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure optional Redis integration test
+        shell: bash
+        env:
+          REDIS_HOST: ${{ secrets.GOREST_TEST_REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.GOREST_TEST_REDIS_PORT }}
+          REDIS_DATABASE: ${{ secrets.GOREST_TEST_REDIS_DATABASE }}
+          REDIS_USER: ${{ secrets.GOREST_TEST_REDIS_USER }}
+          REDIS_PASSWORD: ${{ secrets.GOREST_TEST_REDIS_PASSWORD }}
+          REDIS_TLS: ${{ secrets.GOREST_TEST_REDIS_TLS }}
+          REDIS_CA_PEM: ${{ secrets.GOREST_TEST_REDIS_CA_PEM }}
+          REDIS_CLIENT_CERT_PEM: ${{ secrets.GOREST_TEST_REDIS_CLIENT_CERT_PEM }}
+          REDIS_CLIENT_KEY_PEM: ${{ secrets.GOREST_TEST_REDIS_CLIENT_KEY_PEM }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$REDIS_HOST" ]]; then
+            if [[ -n "$REDIS_PORT$REDIS_DATABASE$REDIS_USER$REDIS_PASSWORD$REDIS_TLS$REDIS_CA_PEM$REDIS_CLIENT_CERT_PEM$REDIS_CLIENT_KEY_PEM" ]]; then
+              echo "Redis test secrets are incomplete: configure the host or remove the partial configuration."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ "$REDIS_HOST$REDIS_PORT$REDIS_DATABASE$REDIS_USER$REDIS_PASSWORD$REDIS_TLS" == *$'\n'* ]]; then
+            echo "Redis connection settings must not contain newline characters."
+            exit 1
+          fi
+          if [[ -n "$REDIS_CLIENT_CERT_PEM" && -z "$REDIS_CLIENT_KEY_PEM" ]] || [[ -z "$REDIS_CLIENT_CERT_PEM" && -n "$REDIS_CLIENT_KEY_PEM" ]]; then
+            echo "Configure both Redis client certificate and key secrets, or neither."
+            exit 1
+          fi
+
+          umask 077
+          {
+            printf 'GOREST_REDIS_DISABLE=false\n'
+            printf 'GOREST_REDIS_HOST=%s\n' "$REDIS_HOST"
+            printf 'GOREST_REDIS_PORT=%s\n' "${REDIS_PORT:-6379}"
+            printf 'GOREST_REDIS_DATABASE=%s\n' "${REDIS_DATABASE:-0}"
+            printf 'GOREST_REDIS_USER=%s\n' "$REDIS_USER"
+            printf 'GOREST_REDIS_PASSWORD=%s\n' "$REDIS_PASSWORD"
+            printf 'GOREST_REDIS_TLS=%s\n' "${REDIS_TLS:-false}"
+          } >> "$GITHUB_ENV"
+
+          if [[ -n "$REDIS_CA_PEM" ]]; then
+            ca_file="$RUNNER_TEMP/gorest-redis-ca.pem"
+            printf '%s\n' "$REDIS_CA_PEM" > "$ca_file"
+            printf 'GOREST_REDIS_CA_PATH=%s\n' "$ca_file" >> "$GITHUB_ENV"
+          fi
+          if [[ -n "$REDIS_CLIENT_CERT_PEM" ]]; then
+            cert_file="$RUNNER_TEMP/gorest-redis-client-cert.pem"
+            key_file="$RUNNER_TEMP/gorest-redis-client-key.pem"
+            printf '%s\n' "$REDIS_CLIENT_CERT_PEM" > "$cert_file"
+            printf '%s\n' "$REDIS_CLIENT_KEY_PEM" > "$key_file"
+            printf 'GOREST_REDIS_CERT_PATH=%s\n' "$cert_file" >> "$GITHUB_ENV"
+            printf 'GOREST_REDIS_KEY_PATH=%s\n' "$key_file" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure optional Redis mTLS test
+        shell: bash
+        env:
+          REDIS_MTLS_HOST: ${{ secrets.GOREST_TEST_REDIS_MTLS_HOST }}
+          REDIS_MTLS_PORT: ${{ secrets.GOREST_TEST_REDIS_MTLS_PORT }}
+          REDIS_MTLS_DATABASE: ${{ secrets.GOREST_TEST_REDIS_MTLS_DATABASE }}
+          REDIS_MTLS_USER: ${{ secrets.GOREST_TEST_REDIS_MTLS_USER }}
+          REDIS_MTLS_PASSWORD: ${{ secrets.GOREST_TEST_REDIS_MTLS_PASSWORD }}
+          REDIS_MTLS_CA_PEM: ${{ secrets.GOREST_TEST_REDIS_MTLS_CA_PEM }}
+          REDIS_MTLS_CLIENT_CERT_PEM: ${{ secrets.GOREST_TEST_REDIS_MTLS_CLIENT_CERT_PEM }}
+          REDIS_MTLS_CLIENT_KEY_PEM: ${{ secrets.GOREST_TEST_REDIS_MTLS_CLIENT_KEY_PEM }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$REDIS_MTLS_HOST" ]]; then
+            if [[ -n "$REDIS_MTLS_PORT$REDIS_MTLS_DATABASE$REDIS_MTLS_USER$REDIS_MTLS_PASSWORD$REDIS_MTLS_CA_PEM$REDIS_MTLS_CLIENT_CERT_PEM$REDIS_MTLS_CLIENT_KEY_PEM" ]]; then
+              echo "Redis mTLS secrets are incomplete: configure the host or remove the partial configuration."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ -z "$REDIS_MTLS_DATABASE" || -z "$REDIS_MTLS_CA_PEM" || -z "$REDIS_MTLS_CLIENT_CERT_PEM" || -z "$REDIS_MTLS_CLIENT_KEY_PEM" ]]; then
+            echo "Redis mTLS is enabled but the database, CA, or client certificate/key secrets are missing."
+            exit 1
+          fi
+          if [[ "$REDIS_MTLS_HOST$REDIS_MTLS_PORT$REDIS_MTLS_DATABASE$REDIS_MTLS_USER$REDIS_MTLS_PASSWORD" == *$'\n'* ]]; then
+            echo "Redis mTLS connection settings must not contain newline characters."
+            exit 1
+          fi
+
+          umask 077
+          mtls_ca_file="$RUNNER_TEMP/gorest-redis-mtls-ca.pem"
+          mtls_cert_file="$RUNNER_TEMP/gorest-redis-mtls-client-cert.pem"
+          mtls_key_file="$RUNNER_TEMP/gorest-redis-mtls-client-key.pem"
+          printf '%s\n' "$REDIS_MTLS_CA_PEM" > "$mtls_ca_file"
+          printf '%s\n' "$REDIS_MTLS_CLIENT_CERT_PEM" > "$mtls_cert_file"
+          printf '%s\n' "$REDIS_MTLS_CLIENT_KEY_PEM" > "$mtls_key_file"
+          {
+            printf 'GOREST_TEST_REDIS_MTLS_HOST=%s\n' "$REDIS_MTLS_HOST"
+            printf 'GOREST_TEST_REDIS_MTLS_PORT=%s\n' "${REDIS_MTLS_PORT:-6379}"
+            printf 'GOREST_TEST_REDIS_MTLS_DATABASE=%s\n' "$REDIS_MTLS_DATABASE"
+            printf 'GOREST_TEST_REDIS_MTLS_USER=%s\n' "$REDIS_MTLS_USER"
+            printf 'GOREST_TEST_REDIS_MTLS_PASSWORD=%s\n' "$REDIS_MTLS_PASSWORD"
+            printf 'GOREST_TEST_REDIS_MTLS_CA_FILE=%s\n' "$mtls_ca_file"
+            printf 'GOREST_TEST_REDIS_MTLS_CLIENT_CERT_FILE=%s\n' "$mtls_cert_file"
+            printf 'GOREST_TEST_REDIS_MTLS_CLIENT_KEY_FILE=%s\n' "$mtls_key_file"
+          } >> "$GITHUB_ENV"
+
+      - name: Run MySQL HTTP integration tests
+        run: make integration-reports
+
+      - name: Upload integration coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/integration.coverprofile
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
       - name: Upload integration test reports
         if: always()
@@ -152,5 +316,8 @@ jobs:
           path: |
             coverage/integration-test.txt
             coverage/integration-test.json
+            coverage/integration.coverprofile
+            coverage/integration-coverage.txt
+            coverage/integration-coverage.html
           if-no-files-found: warn
           retention-days: 30

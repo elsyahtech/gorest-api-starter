@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: run test unit-test test-integration integration-report integration-json coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
+.PHONY: run test unit-test test-integration integration-report integration-json integration-reports coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
 
 run:
 	go run .
@@ -13,13 +13,10 @@ unit-test:
 test-integration:
 	go test -tags=integration -v -count=1 -timeout=5m ./integration-test
 
-integration-report:
-	mkdir -p coverage
-	set -o pipefail; go test -tags=integration -v -count=1 -timeout=5m ./integration-test 2>&1 | tee coverage/integration-test.txt
+integration-report integration-json: integration-reports
 
-integration-json:
-	mkdir -p coverage
-	go test -tags=integration -json -count=1 -timeout=5m ./integration-test > coverage/integration-test.json
+integration-reports:
+	go run ./scripts/integration-report.go
 
 coverage:
 	mkdir -p coverage
@@ -87,4 +84,4 @@ push:
 	bash ./scripts/push.sh
 
 clean:
-	rm -f bin/gorest-api-starter coverage/unit.coverprofile coverage/unit-coverage.txt coverage/unit-coverage.html coverage/integration-test.txt coverage/integration-test.json
+	rm -f bin/gorest-api-starter coverage/unit.coverprofile coverage/unit-coverage.txt coverage/unit-coverage.html coverage/integration-test.txt coverage/integration-test.json coverage/integration.coverprofile coverage/integration-coverage.txt coverage/integration-coverage.html

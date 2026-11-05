@@ -70,6 +70,7 @@ service-account*.json
 /logs/
 /coverage/
 /app/database/var/
+/cert/
 *.log
 *.tmp
 *.swp

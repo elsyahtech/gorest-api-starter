@@ -28,7 +28,7 @@ Responses return through the handler. `app/view` maps user entities to public re
 | `app/entity` | Defines the user entity and public response data structures. |
 | `app/view` | Converts entities into public response DTOs. |
 | `app/database/migrations/mysql` | Contains the MySQL schema migration. |
-| `integration-test` | Exercises the running HTTP application against a separately configured external MySQL test database. |
+| `integration-test` | Exercises the running HTTP application against a separately configured external MySQL test database and optionally verifies MySQL mTLS and Redis service behavior. |
 
 There is no separate service package: `app/library` owns the current application logic. Redis is optional infrastructure wiring, disabled by default; the user endpoints do not depend on it.
 

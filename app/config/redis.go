@@ -30,14 +30,10 @@ func RedisConfig() (redis.Config, error) {
 	}
 
 	cfg.SSLCertPath = str("GOREST_REDIS_CERT_PATH", "")
-	if cfg.SSLCertPath == "" {
-		if cfg.TLS {
-			// This starter requires a certificate path when Redis TLS is enabled.
-			return redis.Config{}, errors.New("GOREST_REDIS_CERT_PATH cannot be empty when GOREST_REDIS_TLS is true")
-		}
-	}
-
 	cfg.SSLKeyPath = str("GOREST_REDIS_KEY_PATH", "")
+	if (cfg.SSLCertPath == "") != (cfg.SSLKeyPath == "") {
+		return redis.Config{}, errors.New("GOREST_REDIS_CERT_PATH and GOREST_REDIS_KEY_PATH must be configured together")
+	}
 	cfg.SSLCAPath = str("GOREST_REDIS_CA_PATH", "")
 	cfg.Timeout = strToTimeDuration("GOREST_REDIS_TIMEOUT", redis.DefaultRedisTimeout)
 	cfg.PoolTimeout = strToTimeDuration("GOREST_REDIS_POOL_TIMEOUT", redis.DefaultRedisPoolTimeout)

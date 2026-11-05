@@ -18,6 +18,9 @@ type mysqlTestConfig struct {
 	username string
 	password string
 	tls      string
+	caPath   string
+	certPath string
+	keyPath  string
 }
 
 func loadMySQLTestConfig() (mysqlTestConfig, error) {
@@ -64,6 +67,22 @@ func loadMySQLTestConfig() (mysqlTestConfig, error) {
 		}
 	}
 
+	testValue := func(testKey, appKey string) string {
+		if current := os.Getenv(testKey); current != "" {
+			return current
+		}
+		if configured := values[testKey]; configured != "" {
+			return configured
+		}
+		if usesApplicationConfig {
+			if current := os.Getenv(appKey); current != "" {
+				return current
+			}
+			return values[appKey]
+		}
+		return ""
+	}
+
 	config := mysqlTestConfig{
 		host:     strings.TrimSpace(value("GOREST_TEST_MYSQL_HOST", "GOREST_DB_HOST")),
 		port:     strings.TrimSpace(value("GOREST_TEST_MYSQL_PORT", "GOREST_DB_PORT")),
@@ -71,6 +90,18 @@ func loadMySQLTestConfig() (mysqlTestConfig, error) {
 		username: value("GOREST_TEST_MYSQL_USER", "GOREST_DB_USER"),
 		password: value("GOREST_TEST_MYSQL_PASSWORD", "GOREST_DB_PASSWORD"),
 		tls:      strings.TrimSpace(value("GOREST_TEST_MYSQL_TLS", "GOREST_DB_TLS")),
+		caPath:   testValue("GOREST_TEST_MYSQL_CA_FILE", "GOREST_DB_CA_PATH"),
+		certPath: testValue("GOREST_TEST_MYSQL_CERT_FILE", "GOREST_DB_CERT_PATH"),
+		keyPath:  testValue("GOREST_TEST_MYSQL_KEY_FILE", "GOREST_DB_KEY_PATH"),
+	}
+	for _, path := range []*string{&config.caPath, &config.certPath, &config.keyPath} {
+		if *path != "" {
+			resolved, err := resolveMySQLTestPath(*path)
+			if err != nil {
+				return mysqlTestConfig{}, fmt.Errorf("resolve MySQL integration TLS file: %w", err)
+			}
+			*path = resolved
+		}
 	}
 	if config.port == "" {
 		config.port = "3306"
@@ -125,7 +156,9 @@ func (config mysqlTestConfig) appEnvironment(serverPort, logDirectory, signature
 		"GOREST_DB_USER":                 config.username,
 		"GOREST_DB_PASSWORD":             config.password,
 		"GOREST_DB_TLS":                  config.tls,
-		"GOREST_DB_CA_PATH":              "",
+		"GOREST_DB_CA_PATH":              config.caPath,
+		"GOREST_DB_CERT_PATH":            config.certPath,
+		"GOREST_DB_KEY_PATH":             config.keyPath,
 		"GOREST_DB_MAX_IDLE_CONNECTIONS": "0",
 		"GOREST_DB_MIGRATION":            "false",
 		"GOREST_DB_SEEDER":               "false",

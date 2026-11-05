@@ -378,6 +378,37 @@ func TestLoadRedisCanBeExplicitlyEnabled(t *testing.T) {
 	}
 }
 
+func TestLoadRedisAllowsServerTLSWithoutClientCertificate(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_APP_ENV", gorest.Development)
+	t.Setenv("GOREST_REDIS_DISABLE", "false")
+	t.Setenv("GOREST_REDIS_TLS", "true")
+
+	cfg, err := RedisConfig()
+	if err != nil {
+		t.Fatalf("RedisConfig() error = %v, want server-authenticated TLS without a client certificate", err)
+	}
+	if !cfg.TLS || cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
+		t.Fatalf("RedisConfig() TLS fields = (TLS:%t, cert:%q, key:%q), want TLS enabled without a client certificate", cfg.TLS, cfg.SSLCertPath, cfg.SSLKeyPath)
+	}
+}
+
+func TestLoadRedisRequiresClientCertificateAndKeyTogether(t *testing.T) {
+	for _, field := range []string{"GOREST_REDIS_CERT_PATH", "GOREST_REDIS_KEY_PATH"} {
+		t.Run(field, func(t *testing.T) {
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_APP_ENV", gorest.Development)
+			t.Setenv("GOREST_REDIS_DISABLE", "false")
+			t.Setenv("GOREST_REDIS_TLS", "true")
+			t.Setenv(field, "configured")
+
+			if _, err := RedisConfig(); err == nil {
+				t.Fatalf("RedisConfig() error = nil, want paired client certificate/key validation")
+			}
+		})
+	}
+}
+
 func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 	for _, mode := range []string{gorest.Development, gorest.Production, gorest.Testing} {
 		t.Run("accepts "+mode, func(t *testing.T) {
@@ -771,5 +802,26 @@ func TestDatabaseConfigAllowsMySQLTLSWithoutCAPath(t *testing.T) {
 	if cfg.TLS != "true" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" {
 		t.Errorf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q), want TLS enabled without CA or client certificate",
 			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath)
+	}
+}
+
+func TestDatabaseConfigMapsMySQLMTLSCertificatePaths(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_DRIVER", "mysql")
+	t.Setenv("GOREST_DB_USER", "test-user")
+	t.Setenv("GOREST_DB_PASSWORD", "test-password")
+	t.Setenv("GOREST_DB_TLS", "true")
+	t.Setenv("GOREST_DB_CA_PATH", "/test/ca.pem")
+	t.Setenv("GOREST_DB_CERT_PATH", "/test/client-cert.pem")
+	t.Setenv("GOREST_DB_KEY_PATH", "/test/client-key.pem")
+
+	cfg, err := DatabaseConfig()
+	if err != nil {
+		t.Fatalf("DatabaseConfig() with MySQL mTLS paths error = %v", err)
+	}
+	if cfg.TLS != "true" || cfg.SSLCAPath != "/test/ca.pem" ||
+		cfg.SSLCertPath != "/test/client-cert.pem" || cfg.SSLKeyPath != "/test/client-key.pem" {
+		t.Fatalf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want configured mTLS paths",
+			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
 	}
 }

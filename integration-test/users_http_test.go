@@ -256,7 +256,9 @@ func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
 		"GOREST_DB_USER":                      config.username,
 		"GOREST_DB_PASSWORD":                  config.password,
 		"GOREST_DB_TLS":                       config.tls,
-		"GOREST_DB_CA_PATH":                   "",
+		"GOREST_DB_CA_PATH":                   config.caPath,
+		"GOREST_DB_CERT_PATH":                 config.certPath,
+		"GOREST_DB_KEY_PATH":                  config.keyPath,
 		"GOREST_DB_MIGRATION":                 "false",
 		"GOREST_DB_SEEDER":                    "false",
 		"GOREST_DB_ALLOW_INSECURE_PRODUCTION": "false",
@@ -283,7 +285,13 @@ func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string)
 	}
 	temporaryDirectory := t.TempDir()
 	binaryPath := filepath.Join(temporaryDirectory, "gorest-api-starter")
-	build := exec.Command("go", "build", "-o", binaryPath, ".")
+	buildArgs := []string{"build"}
+	coverageDirectory := strings.TrimSpace(os.Getenv("GOREST_INTEGRATION_COVERAGE_DIR"))
+	if coverageDirectory != "" {
+		buildArgs = append(buildArgs, "-cover", "-coverpkg=.,./app/...")
+	}
+	buildArgs = append(buildArgs, "-o", binaryPath, ".")
+	build := exec.Command("go", buildArgs...)
 	build.Dir = projectRoot
 	var buildOutput bytes.Buffer
 	build.Stdout = &buildOutput
@@ -297,6 +305,9 @@ func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string)
 		t.Fatalf("create temporary application log directory: %v", err)
 	}
 	environment := config.appEnvironment(fmt.Sprint(port), logDirectory, signatureKey)
+	if coverageDirectory != "" {
+		environment["GOCOVERDIR"] = coverageDirectory
+	}
 	command := exec.Command(binaryPath)
 	command.Dir = temporaryDirectory
 	command.Env = mergeEnvironment(os.Environ(), environment)
