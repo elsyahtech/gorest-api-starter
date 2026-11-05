@@ -30,6 +30,8 @@ go.work.sum
 .env.*
 !.env.example
 !.env.*.example
+.envrc
+.envrc.local
 *.local
 *.local.*
 
@@ -40,6 +42,18 @@ go.work.sum
 *.pfx
 *.jks
 *.keystore
+*.crt
+*.cer
+*.der
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+.ssh/
+.aws/credentials
+.config/gcloud/application_default_credentials.json
+credentials.json
+service-account*.json
 
 # Local databases, backups, and dumps
 *.db
@@ -54,6 +68,7 @@ go.work.sum
 # Generated application artifacts
 /bin/
 /logs/
+/coverage/
 /app/database/var/
 *.log
 *.tmp
@@ -64,4 +79,3 @@ go.work.sum
 .idea/
 .vscode/
 .DS_Store
-/app/config/hanya_referensi.txt

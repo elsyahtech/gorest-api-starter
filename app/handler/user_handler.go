@@ -24,7 +24,7 @@ func (hndlr *UserHandler) Login(ctx *gorest.Context) error {
 			"error": err,
 		}).Error(message)
 
-		return response.SendJSON(ctx, response, err)
+		return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 	}
 
 	message, httpCode, err = hndlr.UserLibrary.Login(ctx, &request)
@@ -35,12 +35,12 @@ func (hndlr *UserHandler) Login(ctx *gorest.Context) error {
 			"error": err,
 		}).Error(message)
 
-		return response.SendJSON(ctx, response, err)
+		return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 	}
 
 	response.WithMessage("Login successful", nil, httpCode)
 
-	return response.SendJSON(ctx, response, nil)
+	return response.SendJSON(ctx, response, nil) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 }
 
 // CreateUser handles a request to create a user through the ORM.
@@ -61,7 +61,7 @@ func (handler *UserHandler) CreateUser(ctx *gorest.Context) error {
 			"error": err,
 		}).Error(message)
 
-		return response.SendJSON(ctx, response, err)
+		return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 	}
 
 	message, httpCode, err = handler.UserLibrary.CreateUser(&request)
@@ -72,12 +72,12 @@ func (handler *UserHandler) CreateUser(ctx *gorest.Context) error {
 			"error": err,
 		}).Error(message)
 
-		return response.SendJSON(ctx, response, err)
+		return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 	}
 
 	response.WithMessage(message, nil, httpCode)
 
-	return response.SendJSON(ctx, response, nil)
+	return response.SendJSON(ctx, response, nil) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 }
 
 func (handler *UserHandler) GetUsers(ctx *gorest.Context) error {
@@ -95,12 +95,12 @@ func (handler *UserHandler) GetUsers(ctx *gorest.Context) error {
 			"error": err,
 		}).Error(message)
 
-		return response.SendJSON(ctx, response, err)
+		return response.SendJSON(ctx, response, err) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 	}
 
 	response.Data = resview.BuildUserResponseArray(data)
 
 	response.WithMessage(message, nil, httpCode)
 
-	return response.SendJSON(ctx, response, nil)
+	return response.SendJSON(ctx, response, nil) //nolint:wrapcheck // reason: wrapcheck is disabled for this line to avoid unnecessary error wrapping.
 }

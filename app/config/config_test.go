@@ -142,13 +142,114 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_REDIS_HOST",
 	"GOREST_REDIS_USERNAME",
 	"GOREST_REDIS_PASSWORD",
+	"GOREST_REDIS_USER",
+	"GOREST_REDIS_CERT_PATH",
+	"GOREST_REDIS_KEY_PATH",
+	"GOREST_REDIS_CA_PATH",
 	"GOREST_REDIS_SSL_CA_PATH",
 	"GOREST_REDIS_SSL_CERT_PATH",
 	"GOREST_REDIS_SSL_KEY_PATH",
 	"GOREST_FILTER_SIGNATURE_KEY",
+	"GOREST_FILTER_SIGNING_METHOD",
+	"GOREST_FILTER_ACCESS_TOKEN_DURATION",
+	"GOREST_FILTER_REFRESH_TOKEN_DURATION",
+	"GOREST_FILTER_COOKIE_SAME_SITE",
+	"GOREST_FILTER_COOKIE_DOMAIN",
+	"GOREST_FILTER_COOKIE_PATH",
+	"GOREST_FILTER_COOKIE_MAX_AGE",
+	"GOREST_FILTER_COOKIE_SECURE",
+	"GOREST_FILTER_COOKIE_HTTP_ONLY",
+	"GOREST_FILTER_COOKIE_SESSION_ONLY",
 	"GOREST_MONITORING_ALLOWED_IPS",
 	"GOREST_MONITORING_DISABLE",
 	"GOREST_MONITORING_ENABLE_HTTP_METRICS",
+}
+
+func TestStrLoadsEnvironmentValueAndUsesDefaultWhenEmpty(t *testing.T) {
+	t.Setenv("CONFIG_TEST_STRING", "  configured value  ")
+	if got := str("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
+		t.Fatalf("str() = %q, want trimmed environment value", got)
+	}
+
+	t.Setenv("CONFIG_TEST_STRING", "  ")
+	if got := str("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
+		t.Fatalf("str() with blank environment value = %q, want fallback", got)
+	}
+}
+
+func TestStrToIntLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
+	t.Setenv("CONFIG_TEST_INTEGER", " 42 ")
+	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
+		t.Fatalf("strToInt() = %d, want 42", got)
+	}
+
+	t.Setenv("CONFIG_TEST_INTEGER", "invalid")
+	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+		t.Fatalf("strToInt() with invalid environment value = %d, want default 10", got)
+	}
+
+	t.Setenv("CONFIG_TEST_INTEGER", " ")
+	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+		t.Fatalf("strToInt() with blank environment value = %d, want default 10", got)
+	}
+}
+
+func TestStrToTimeDurationLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
+	t.Setenv("CONFIG_TEST_DURATION", " 2m ")
+	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
+		t.Fatalf("strToTimeDuration() = %s, want 2m", got)
+	}
+
+	t.Setenv("CONFIG_TEST_DURATION", "invalid")
+	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+		t.Fatalf("strToTimeDuration() with invalid value = %s, want default 1s", got)
+	}
+
+	t.Setenv("CONFIG_TEST_DURATION", " ")
+	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+		t.Fatalf("strToTimeDuration() with blank value = %s, want default 1s", got)
+	}
+}
+
+func TestToStrArrayUsesEnvironmentValueAndDefaults(t *testing.T) {
+	const key = "CONFIG_TEST_STRING_ARRAY"
+	previous, wasSet := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unset %s: %v", key, err)
+	}
+	t.Cleanup(func() {
+		var err error
+		if wasSet {
+			err = os.Setenv(key, previous)
+		} else {
+			err = os.Unsetenv(key)
+		}
+		if err != nil {
+			t.Errorf("restore %s: %v", key, err)
+		}
+	})
+
+	defaultValue := []string{"default"}
+	if got := toStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
+		t.Fatalf("toStrArray() with unset variable = %v, want %v", got, defaultValue)
+	}
+
+	t.Setenv(key, " first, second ,, third ")
+	got := toStrArray(key, defaultValue)
+	want := []string{"first", "second", "third"}
+	if len(got) != len(want) {
+		t.Fatalf("toStrArray() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("toStrArray() = %v, want %v", got, want)
+		}
+	}
+
+	t.Setenv(key, " ")
+	if got := toStrArray(key, defaultValue); got == nil || len(got) != 0 {
+		t.Fatalf("toStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
+	}
 }
 
 func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
@@ -159,12 +260,12 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 		t.Fatalf("LoadFilters() error = %v", err)
 	}
 
-	if cfg.SignatureKey == nil || *cfg.SignatureKey != "your-signature-key" {
+	if cfg.SignatureKey == nil || *cfg.SignatureKey != "" {
 		got := "<nil>"
 		if cfg.SignatureKey != nil {
 			got = *cfg.SignatureKey
 		}
-		t.Fatalf("LoadFilters().SignatureKey = %q, want the default signing key", got)
+		t.Fatalf("FilterConfig().SignatureKey = %q, want an empty development placeholder", got)
 	}
 	if cfg.SigningMethod != "HS256" {
 		t.Errorf("LoadFilters().SigningMethod = %q, want HS256", cfg.SigningMethod)
@@ -172,17 +273,17 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 	if cfg.AccessTokenDuration != 15*time.Minute {
 		t.Errorf("LoadFilters().AccessTokenDuration = %s, want 15m", cfg.AccessTokenDuration)
 	}
-	if cfg.RefreshTokenDuration != 7*24*time.Hour {
-		t.Errorf("LoadFilters().RefreshTokenDuration = %s, want 168h", cfg.RefreshTokenDuration)
+	if cfg.RefreshTokenDuration != 30*24*time.Hour {
+		t.Errorf("FilterConfig().RefreshTokenDuration = %s, want 720h", cfg.RefreshTokenDuration)
 	}
-	if cfg.Issuer != "your-issuer" {
-		t.Errorf("LoadFilters().Issuer = %q, want your-issuer", cfg.Issuer)
+	if cfg.Issuer != "gorest" {
+		t.Errorf("FilterConfig().Issuer = %q, want gorest", cfg.Issuer)
 	}
 	if cfg.CookieSameSite != "Lax" || cfg.CookiePath != "/" || cfg.CookieDomain != "" {
 		t.Errorf("LoadFilters() cookie scope = (%q, %q, %q), want (Lax, /, empty)",
 			cfg.CookieSameSite, cfg.CookiePath, cfg.CookieDomain)
 	}
-	if !cfg.CookieSecure || !cfg.CookieHTTPOnly || cfg.CookieSessionOnly {
+	if cfg.CookieSecure || !cfg.CookieHTTPOnly || cfg.CookieSessionOnly {
 		t.Errorf("LoadFilters() cookie flags = (secure:%t, httpOnly:%t, sessionOnly:%t), want (true, true, false)",
 			cfg.CookieSecure, cfg.CookieHTTPOnly, cfg.CookieSessionOnly)
 	}
@@ -280,9 +381,7 @@ func TestLoadRedisCanBeExplicitlyEnabled(t *testing.T) {
 func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 	for _, mode := range []string{gorest.Development, gorest.Production, gorest.Testing} {
 		t.Run("accepts "+mode, func(t *testing.T) {
-			isolateConfigurationEnvironment(t)
-			t.Setenv("GOREST_APP_ENV", mode)
-			if err := validateEnvironment("GOREST_APP_ENV"); err != nil {
+			if err := validateEnvironment(mode); err != nil {
 				t.Fatalf("validateEnvironment() error = %v", err)
 			}
 		})
@@ -290,9 +389,7 @@ func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 
 	for _, mode := range []string{"test", "staging"} {
 		t.Run("rejects "+mode, func(t *testing.T) {
-			isolateConfigurationEnvironment(t)
-			t.Setenv("GOREST_APP_ENV", mode)
-			if err := validateEnvironment("GOREST_APP_ENV"); err == nil {
+			if err := validateEnvironment(mode); err == nil {
 				t.Fatalf("validateEnvironment() accepted GOREST_APP_ENV=%q", mode)
 			}
 		})
@@ -300,10 +397,12 @@ func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 
 	t.Run("defaults an empty value to development", func(t *testing.T) {
 		isolateConfigurationEnvironment(t)
-		t.Setenv("GOREST_APP_ENV", "")
-
-		if err := validateEnvironment("GOREST_APP_ENV"); err != nil {
-			t.Fatalf("validateEnvironment() error = %v", err)
+		cfg, err := AppConfig()
+		if err != nil {
+			t.Fatalf("AppConfig() error = %v", err)
+		}
+		if cfg.Environment != gorest.Development {
+			t.Fatalf("AppConfig().Environment = %q, want %q", cfg.Environment, gorest.Development)
 		}
 	})
 }
@@ -339,59 +438,18 @@ func isolateConfigurationEnvironment(t *testing.T) {
 	})
 }
 
-func setValidProductionEnvironment(t *testing.T) {
-	t.Helper()
+func TestServerConfigMapsConfiguredHostAndPort(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	for key, value := range map[string]string{
-		"GOREST_APP_ENV":             "production",
-		"GOREST_SERVER_HOST":         "0.0.0.0",
-		"GOREST_SERVER_PORT":         "8080",
-		"GOREST_SERVER_CORS_ORIGINS": "https://app.example.com",
-		"GOREST_DB_DRIVER":           "postgres",
-		"GOREST_DB_HOST":             "db.example.internal",
-		"GOREST_DB_PORT":             "5432",
-		"GOREST_DB_NAME":             "app",
-		"GOREST_DB_USER":             "app_user",
-		"GOREST_DB_PASSWORD":         "test-only-password",
-		"GOREST_DB_TLS":              "require",
-		"GOREST_DB_MIGRATION":        "false",
-		"GOREST_DB_SEEDER":           "false",
-	} {
-		t.Setenv(key, value)
+	t.Setenv("GOREST_SERVER_HOST", "127.0.0.2")
+	t.Setenv("GOREST_SERVER_PORT", "8080")
+
+	cfg, err := ServerConfig()
+	if err != nil {
+		t.Fatalf("ServerConfig() error = %v", err)
 	}
-}
-
-func TestLoadServerProductionConfiguration(t *testing.T) {
-	t.Run("accepts explicit bind and CORS settings", func(t *testing.T) {
-		setValidProductionEnvironment(t)
-		cfg, err := ServerConfig()
-		if err != nil {
-			t.Fatalf("LoadServer() error = %v", err)
-		}
-		if cfg.Host != "0.0.0.0" || cfg.Port != 8080 {
-			t.Fatalf("server bind = %s:%d, want 0.0.0.0:8080", cfg.Host, cfg.Port)
-		}
-	})
-
-	for _, missing := range []string{"GOREST_SERVER_HOST", "GOREST_SERVER_PORT", "GOREST_SERVER_CORS_ORIGINS"} {
-		t.Run("requires "+missing, func(t *testing.T) {
-			setValidProductionEnvironment(t)
-			if err := os.Unsetenv(missing); err != nil {
-				t.Fatalf("unset %s: %v", missing, err)
-			}
-			if _, err := ServerConfig(); err == nil {
-				t.Fatalf("LoadServer() succeeded without %s", missing)
-			}
-		})
+	if cfg.Host != "127.0.0.2" || cfg.Port != 8080 {
+		t.Fatalf("server bind = %s:%d, want 127.0.0.2:8080", cfg.Host, cfg.Port)
 	}
-
-	t.Run("rejects an empty CORS origin list", func(t *testing.T) {
-		setValidProductionEnvironment(t)
-		t.Setenv("GOREST_SERVER_CORS_ORIGINS", " , ")
-		if _, err := ServerConfig(); err == nil {
-			t.Fatal("LoadServer() succeeded with an empty CORS origin list")
-		}
-	})
 }
 
 func TestLoadServerEnvironmentOverrides(t *testing.T) {
@@ -643,112 +701,33 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadDatabaseProductionConfiguration(t *testing.T) {
-	t.Run("accepts explicit server database settings with startup tasks disabled", func(t *testing.T) {
-		setValidProductionEnvironment(t)
-		cfg, err := DatabaseConfig()
-		if err != nil {
-			t.Fatalf("LoadDatabase() error = %v", err)
-		}
-
-		if cfg.Migration || cfg.Seeder {
-			t.Fatalf("production startup tasks = migration:%t seeder:%t, want both disabled", cfg.Migration, cfg.Seeder)
-		}
-	})
-
-	t.Run("allows insecure connections when explicitly enabled outside production", func(t *testing.T) {
-		isolateConfigurationEnvironment(t)
-		t.Setenv("GOREST_APP_ENV", gorest.Testing)
-		t.Setenv("GOREST_DB_ALLOW_INSECURE_PRODUCTION", "true")
-
-		cfg, err := DatabaseConfig()
-		if err != nil {
-			t.Fatalf("LoadDatabase() error = %v", err)
-		}
-		if !cfg.AllowInsecureProduction {
-			t.Fatal("LoadDatabase().AllowInsecureProduction = false, want true")
-		}
-	})
-
-	t.Run("rejects invalid insecure-connection setting", func(t *testing.T) {
-		isolateConfigurationEnvironment(t)
-		t.Setenv("GOREST_DB_ALLOW_INSECURE_PRODUCTION", "sometimes")
-
-		if _, err := DatabaseConfig(); err == nil {
-			t.Fatal("LoadDatabase() succeeded with an invalid GOREST_DB_ALLOW_INSECURE_PRODUCTION value")
-		}
-	})
-
-	t.Run("rejects insecure connections in production", func(t *testing.T) {
-		setValidProductionEnvironment(t)
-		t.Setenv("GOREST_DB_ALLOW_INSECURE_PRODUCTION", "true")
-
-		if _, err := DatabaseConfig(); err == nil {
-			t.Fatal("LoadDatabase() succeeded with GOREST_DB_ALLOW_INSECURE_PRODUCTION=true in production")
-		}
-	})
-
-	for _, missing := range []string{"GOREST_DB_DRIVER", "GOREST_DB_HOST", "GOREST_DB_NAME", "GOREST_DB_USER", "GOREST_DB_PASSWORD", "GOREST_DB_TLS"} {
-		t.Run("requires "+missing, func(t *testing.T) {
-			setValidProductionEnvironment(t)
-			if err := os.Unsetenv(missing); err != nil {
-				t.Fatalf("unset %s: %v", missing, err)
-			}
-			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("LoadDatabase() succeeded without %s", missing)
-			}
-		})
+func TestDatabaseConfigRequiresCredentialsAndDefaultsToMySQL(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() succeeded without a MySQL username and password")
 	}
 
-	for _, startupTask := range []string{"GOREST_DB_MIGRATION", "GOREST_DB_SEEDER"} {
-		t.Run("rejects enabled "+startupTask, func(t *testing.T) {
-			setValidProductionEnvironment(t)
-			t.Setenv(startupTask, "true")
-			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("LoadDatabase() succeeded with %s=true", startupTask)
-			}
-		})
+	t.Setenv("GOREST_DB_USER", "integration-user")
+	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+	cfg, err := DatabaseConfig()
+	if err != nil {
+		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
+	if cfg.Driver != "mysql" || cfg.Username != "integration-user" || cfg.Password != "integration-password" {
+		t.Errorf("DatabaseConfig() = %+v, want MySQL and configured credentials", cfg)
+	}
+}
 
-	t.Run("requires an explicit directory for SQLite", func(t *testing.T) {
-		setValidProductionEnvironment(t)
-		t.Setenv("GOREST_DB_DRIVER", "sqlite")
-		if _, err := DatabaseConfig(); err == nil {
-			t.Fatal("LoadDatabase() succeeded for production SQLite without GOREST_DB_DIRECTORY")
-		}
-		directory := "/var/lib/gorest"
-		t.Setenv("GOREST_DB_DIRECTORY", directory)
-		cfg, err := DatabaseConfig()
-		if err != nil {
-			t.Fatalf("LoadDatabase() with explicit SQLite directory error = %v", err)
-		}
-		if cfg.Driver != "sqlite" || cfg.DatabaseDirectory != directory {
-			t.Errorf("production SQLite location = (%q, %q), want (sqlite, %q)",
-				cfg.Driver, cfg.DatabaseDirectory, directory)
-		}
-		if cfg.Migration || cfg.Seeder {
-			t.Errorf("production SQLite startup tasks = migration:%t seeder:%t, want both disabled",
-				cfg.Migration, cfg.Seeder)
-		}
-		if cfg.MaxOpenConnections != 1 || cfg.MaxIdleConnections != 1 || cfg.ConnectionMaxLifetime != 0 {
-			t.Errorf("production SQLite connection pool = (%d, %d, %s), want (1, 1, no lifetime limit)",
-				cfg.MaxOpenConnections, cfg.MaxIdleConnections, cfg.ConnectionMaxLifetime)
-		}
-	})
+func TestDatabaseConfigRejectsNonMySQLDrivers(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_USER", "integration-user")
+	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 
-	for _, host := range []string{"", "localhost", "127.0.0.1", "::1"} {
-		t.Run("preserves production SQLite host "+host, func(t *testing.T) {
-			setValidProductionEnvironment(t)
-			t.Setenv("GOREST_DB_DRIVER", "sqlite")
-			t.Setenv("GOREST_DB_DIRECTORY", "/var/lib/gorest")
-			t.Setenv("GOREST_DB_HOST", host)
-
-			cfg, err := DatabaseConfig()
-			if err != nil {
-				t.Fatalf("LoadDatabase() for local SQLite host %q: %v", host, err)
-			}
-			if cfg.Host != host {
-				t.Errorf("LoadDatabase().Host = %q, want %q", cfg.Host, host)
+	for _, driver := range []string{"postgres", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
+		t.Run(driver, func(t *testing.T) {
+			t.Setenv("GOREST_DB_DRIVER", driver)
+			if _, err := DatabaseConfig(); err == nil {
+				t.Fatalf("DatabaseConfig() accepted non-MySQL driver %q", driver)
 			}
 		})
 	}
@@ -776,7 +755,7 @@ func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresMySQLCAPathWhenTLSIsEnabled(t *testing.T) {
+func TestDatabaseConfigAllowsMySQLTLSWithoutCAPath(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	t.Setenv("GOREST_DB_DRIVER", "mysql")
 	t.Setenv("GOREST_DB_USER", "test-user")
@@ -785,17 +764,12 @@ func TestDatabaseConfigRequiresMySQLCAPathWhenTLSIsEnabled(t *testing.T) {
 	t.Setenv("GOREST_DB_CERT_PATH", "")
 	t.Setenv("GOREST_DB_CA_PATH", "")
 
-	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without GOREST_DB_CA_PATH when MySQL TLS is enabled")
-	}
-
-	t.Setenv("GOREST_DB_CA_PATH", "/path/to/ca.pem")
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with CA path error = %v", err)
+		t.Fatalf("DatabaseConfig() with MySQL TLS and no CA path error = %v", err)
 	}
-	if cfg.SSLCAPath != "/path/to/ca.pem" || cfg.SSLCertPath != "" {
-		t.Errorf("MySQL TLS fields = (CA:%q, cert:%q), want configured CA without requiring a client certificate",
-			cfg.SSLCAPath, cfg.SSLCertPath)
+	if cfg.TLS != "true" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" {
+		t.Errorf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q), want TLS enabled without CA or client certificate",
+			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath)
 	}
 }

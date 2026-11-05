@@ -1,0 +1,156 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests and coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run unit tests
+        run: go test ./... -count=1
+
+      - name: Generate unit coverage reports
+        run: make coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/unit.coverprofile
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload unit test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unit-test-reports-${{ github.sha }}
+          path: |
+            coverage/unit.coverprofile
+            coverage/unit-coverage.txt
+            coverage/unit-coverage.html
+          if-no-files-found: warn
+          retention-days: 30
+
+  integration-config:
+    name: Check external MySQL test configuration
+    runs-on: ubuntu-24.04
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check required MySQL test secrets
+        id: check
+        shell: bash
+        env:
+          MYSQL_HOST: ${{ secrets.GOREST_TEST_MYSQL_HOST }}
+          MYSQL_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_DATABASE }}
+          MYSQL_USER: ${{ secrets.GOREST_TEST_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.GOREST_TEST_MYSQL_PASSWORD }}
+          MYSQL_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_CONFIRM_DATABASE }}
+          MYSQL_ALLOW_NON_TEST_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE }}
+        run: |
+          configured=true
+          if [[ -z "$MYSQL_HOST" || -z "$MYSQL_DATABASE" || -z "$MYSQL_USER" || -z "$MYSQL_PASSWORD" ]]; then
+            configured=false
+          elif [[ "$MYSQL_CONFIRM_DATABASE" != "$MYSQL_DATABASE" ]]; then
+            configured=false
+          elif [[ "$MYSQL_DATABASE" != *_test && "$MYSQL_DATABASE" != *_testing && "$MYSQL_ALLOW_NON_TEST_DATABASE" != "$MYSQL_DATABASE" ]]; then
+            configured=false
+          fi
+
+          echo "configured=$configured" >> "$GITHUB_OUTPUT"
+          if [[ "$configured" == "false" ]]; then
+            echo "External MySQL E2E skipped: configure the required GOREST_TEST_MYSQL_* repository secrets and exact database confirmation."
+          fi
+
+  integration:
+    name: MySQL HTTP integration tests
+    runs-on: ubuntu-24.04
+    needs: integration-config
+    if: needs.integration-config.outputs.configured == 'true'
+    env:
+      GODEBUG: netdns=cgo
+      GOREST_TEST_MYSQL_HOST: ${{ secrets.GOREST_TEST_MYSQL_HOST }}
+      GOREST_TEST_MYSQL_PORT: ${{ secrets.GOREST_TEST_MYSQL_PORT }}
+      GOREST_TEST_MYSQL_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_DATABASE }}
+      GOREST_TEST_MYSQL_USER: ${{ secrets.GOREST_TEST_MYSQL_USER }}
+      GOREST_TEST_MYSQL_PASSWORD: ${{ secrets.GOREST_TEST_MYSQL_PASSWORD }}
+      GOREST_TEST_MYSQL_TLS: ${{ secrets.GOREST_TEST_MYSQL_TLS }}
+      GOREST_TEST_MYSQL_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_CONFIRM_DATABASE }}
+      GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE: ${{ secrets.GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Configure MySQL TLS trust
+        shell: bash
+        env:
+          MYSQL_TLS: ${{ secrets.GOREST_TEST_MYSQL_TLS }}
+          MYSQL_CA_PEM: ${{ secrets.GOREST_TEST_MYSQL_CA_PEM }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$MYSQL_TLS" != "true" ]]; then
+            exit 0
+          fi
+
+          system_bundle=/etc/ssl/certs/ca-certificates.crt
+          test -r "$system_bundle"
+          trust_bundle="$system_bundle"
+
+          if [[ -n "$MYSQL_CA_PEM" ]]; then
+            ca_path="$RUNNER_TEMP/gorest-mysql-ca.pem"
+            trust_bundle="$RUNNER_TEMP/gorest-mysql-trust-bundle.pem"
+            umask 077
+            printf '%s\n' "$MYSQL_CA_PEM" > "$ca_path"
+            if ! grep -q -- "-----BEGIN CERTIFICATE-----" "$ca_path"; then
+              echo "GOREST_TEST_MYSQL_CA_PEM must contain PEM-encoded certificate data."
+              exit 1
+            fi
+            cat "$system_bundle" "$ca_path" > "$trust_bundle"
+            chmod 600 "$ca_path"
+            chmod 600 "$trust_bundle"
+          fi
+
+          echo "SSL_CERT_FILE=$trust_bundle" >> "$GITHUB_ENV"
+
+      - name: Run MySQL HTTP integration tests
+        run: |
+          make integration-report
+          make integration-json
+
+      - name: Upload integration test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mysql-integration-report-${{ github.sha }}
+          path: |
+            coverage/integration-test.txt
+            coverage/integration-test.json
+          if-no-files-found: warn
+          retention-days: 30

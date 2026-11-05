@@ -1,104 +1,43 @@
 # Getting started
 
-This guide gets the GOREST application starter running locally so you can evaluate it, build on its structure, or use it as the foundation for your own service. The included examples are not ready to be exposed to the internet.
+This guide starts the MySQL user API locally or against a MySQL server that you control.
 
 ## Requirements
 
-- Go `1.26.5` or later, as specified in `go.mod`.
-- No external database is required for the default configuration; GOREST uses SQLite.
+- Go `1.26.5` or newer.
+- A MySQL server reachable from the application host.
+- A MySQL database, user, and password with the privileges needed to create and access the `users` table.
 
-## Set up the application
+## Configure the application
 
-1. The local host is `127.0.0.1`, the port is `3000`, and CORS allows only localhost origins by default. Set `GOREST_CORS_ORIGINS` to a comma-separated list for your browser client. CORS does not prevent command-line or other non-browser clients from making requests.
-2. For local examples, the starter uses GOREST's SQLite defaults and points migration and seeder discovery to `app/database/`. Local startup runs migrations and sample seeders (`Migration=true`, `Seeder=true`), creating the schema and sample data. The SQLite file is `app/database/gorest.db` and is ignored by Git. These settings are for local development only; do not use them unchanged in production.
-3. Run the app from the repository root so the configured relative paths resolve correctly. See the [database guide](./database.md) before switching to another driver.
-
-The application reads supported runtime settings from environment variables. It does not automatically load `.env` files. See the [configuration guide](./configuration.md) for variable names and production validation requirements.
-
-## Run the application
-
-From the repository root, run:
+Copy the example environment file and edit the MySQL connection settings, or provide the settings directly in the process environment:
 
 ```sh
-go run .
+cp .env.example .env
 ```
 
-Or use the Make target:
+Set `GOREST_DB_HOST`, `GOREST_DB_PORT`, `GOREST_DB_NAME`, `GOREST_DB_USER`, and `GOREST_DB_PASSWORD`. Before configuring TLS, review [TLS, private CAs, and client certificates](./database.md#configure-tls-private-cas-and-client-certificates) to learn how the connector uses system trust roots and how to add a private CA to the application process trust bundle. The current connector does not provide mTLS through the certificate/key path settings. Do not put real credentials in source control.
+
+The application loads `.env` when present; it can also start with environment variables alone. `main.go` applies the configured MySQL migration when `GOREST_DB_MIGRATION=true`. Apply the migration once, then disable automatic migration for normal application runs:
 
 ```sh
-make run
+GOREST_DB_MIGRATION=true go run .
+GOREST_DB_MIGRATION=false go run .
 ```
 
-By default, the server listens at `http://127.0.0.1:3000`. If the database connection fails, check that the database exists and that the connection settings are correct.
+The migration creates the MySQL `users` table if it does not exist. The sample seeder is disabled by default. Never run the down migration against data you need: it drops the `users` table.
 
-Keep the process running while trying the requests below. Stop it with `Ctrl+C` when finished.
+The server listens at the configured address, locally `http://127.0.0.1:3000`. To list users, first create a user and log in; see the [API reference](./api-reference.md).
 
-## Try an endpoint
+## Redis
 
-List departments:
+Redis is optional and is disabled by default in `.env.example`. The current user endpoints do not use Redis. Set `GOREST_REDIS_DISABLE=false` only when your application has a Redis instance configured and needs the service.
+
+## Run automated tests
 
 ```sh
-curl http://127.0.0.1:3000/examples/departments
+make unit-test
+make coverage
 ```
 
-List users without returning their password field:
-
-```sh
-curl http://127.0.0.1:3000/examples/orm-queries/users
-```
-
-Create a department:
-
-```sh
-curl -X POST http://127.0.0.1:3000/examples/departments \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "id": "dept-local-01",
-    "name": "Engineering",
-    "description": "Local development department",
-    "isActive": true
-  }'
-```
-
-Create a user with an existing department ID:
-
-```sh
-curl -X POST http://127.0.0.1:3000/examples/orm-queries/users \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "id": "user-local-01",
-    "email": "user@example.com",
-    "password": "local-test-password",
-    "departmentId": "dept-01",
-    "isActive": true
-  }'
-```
-
-The sample data includes departments with IDs `dept-01` through `dept-05`. Use an ID that exists in your selected database. The application uses the GOREST Argon2 helper to hash passwords during user create and update operations that write the password. The user response DTO does not include a `password` property.
-
-For the example relationships, use a `departmentId` and `userId` that exist in your selected database. Create the department and user first, or use IDs from the seed data. Database constraints differ by driver. Resource IDs are supplied by the client in these examples; they are not generated by the application.
-
-For `PATCH`, send only the field(s) supported by that resource. For example, a user patch accepts `isActive` only:
-
-```sh
-curl -X PATCH http://127.0.0.1:3000/examples/orm-queries/users/user-local-01 \
-  -H 'Content-Type: application/json' \
-  -d '{"isActive": false}'
-```
-
-For all routes, request body fields, query examples, and driver limitations, see the [API reference](./api-reference.md). To understand how startup and each request pass through the code, see [Architecture and application lifecycle](./architecture.md).
-
-## Development commands
-
-```sh
-make test       # Run all Go tests with per-test progress (go test -v ./... -count=1)
-make check      # Run go vet and all Go tests with progress and summaries
-make lint       # Run the five pinned baseline linters
-make lint-full  # Run all configured golangci-lint checks
-make test-e2e   # Run the isolated seven-driver E2E matrix (requires Docker)
-make build      # Build bin/gorest-api-starter
-make coverage   # Create coverage.out and coverage.html for E2E-named tests
-make clean      # Remove the binary and coverage files
-```
-
-The lint targets require `golangci-lint` to be installed. `make lint` is the repository's five-linter baseline; `make lint-full` runs every configured linter and may report existing backlog findings. `make test` runs all Go packages without starting database containers. `make test-e2e` provisions disposable containers and runs the database verification matrix for all seven drivers; driver-specific targets are available for faster focused runs. For the exact test scope, see [Testing and E2E coverage](./testing.md). For more development guidance, see [Adding features](./extending.md).
+These commands do not connect to MySQL. For the opt-in end-to-end suite, configure a dedicated external MySQL test database as described in the [testing guide](./testing.md), then run `make test-integration`.

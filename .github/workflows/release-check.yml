@@ -46,7 +46,7 @@ jobs:
             echo "platform=$(go env GOOS)/$(go env GOARCH)"
           } > dist/release-metadata.txt
 
-      - name: Run format, vet, lint, tests, SQLite driver test, secret scan, and build
+      - name: Run format, vet, lint, unit tests, secret scan, and build
         env:
           GOTOOLCHAIN: local
         run: make release-check 2>&1 | tee dist/release-check.log

@@ -8,8 +8,7 @@ import (
 	"github.com/elsyahtech/gorest/server"
 )
 
-// UserRouter registers runnable user-query examples under the /examples prefix.
-// Static paths are registered before parameter paths such as /users/:id.
+// UserRouter wires the user API layers and registers routes under /users.
 func UserRouter(app *gorest.App) {
 	mdl := model.NewUserModel(app)
 	lib := library.NewUserLibrary(app, mdl)

@@ -25,7 +25,9 @@ func BuildUserResponse(response *entity.User) *entity.UserResponse {
 // It returns an empty array when responses is nil or empty.
 func BuildUserResponseArray(responses *[]entity.User) *[]entity.UserResponse {
 	if responses == nil || len(*responses) == 0 {
-		return &[]entity.UserResponse{}
+		users := make([]entity.UserResponse, 0)
+
+		return &users
 	}
 
 	res := make([]entity.UserResponse, 0, len(*responses))

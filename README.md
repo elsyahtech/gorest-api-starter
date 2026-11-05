@@ -1,76 +1,55 @@
-# Gorest API Starter
+# GOREST MySQL API Starter
 
-A ready-to-run application starter built with the [GOREST framework](https://github.com/elsyahtech/gorest). Use it to start an application with GOREST already wired, learn the framework through working examples, and adapt the structure and configuration to your own service. It includes layered CRUD routes, ORM and driver-specific native query examples, migrations, seeders, authentication examples, and tests.
-
-This repository supports adoption of GOREST by providing a complete, modifiable application around the framework. The starter documentation explains this repository's choices; for framework APIs and guarantees, use the matching [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs). Adapt and secure the examples for your business requirements before exposing a service.
+A MySQL-focused application starter built with [GOREST](https://github.com/elsyahtech/gorest/tree/main). It demonstrates a small user API with authentication, password hashing, a MySQL data-access layer, automated unit tests, and opt-in HTTP integration tests against a separately configured MySQL test database.
 
 ## Documentation
 
-Start with the [documentation index](./docs/README.md). The guides are ordered as a learning path:
+Start with the [documentation index](./docs/README.md). The guides cover setup, the active API, architecture, MySQL configuration, and testing evidence.
 
-1. [Getting started](./docs/getting-started.md) — local setup and first requests.
-2. [API reference](./docs/api-reference.md) — routes, request conventions, and examples.
-3. [Architecture and lifecycle](./docs/architecture.md) — packages, end-to-end request flow, and naming conventions.
-4. [Database guide](./docs/database.md) — drivers, migrations, seeders, and transaction limits.
-5. [Configuration and deployment](./docs/configuration.md) — server, database, logging, and security considerations.
-6. [Adding features](./docs/extending.md) — a step-by-step guide to extend the starter consistently.
-7. [Testing and E2E coverage](./docs/testing.md) — run the suite, generate coverage, and verify the seven database drivers.
+## Included endpoints
 
-These guides show how this starter uses GOREST; they do not replace the framework reference. For GOREST framework APIs and behavior matching this starter's dependency, see the [GOREST v1.1.17 documentation](https://github.com/elsyahtech/gorest/tree/v1.1.17/docs).
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/users/create` | Create a user and hash its password |
+| `POST` | `/users/login` | Verify credentials and issue an access cookie |
+| `GET` | `/users/` | List users; requires a valid access cookie |
 
-For vulnerability reporting and the project's security policy, see [SECURITY.md](./SECURITY.md).
+These are starter examples, not a complete production identity or authorization system. Review the [API reference](./docs/api-reference.md) and secure routes according to your application's requirements.
 
-## Important: examples are not production-ready
-
-Most routes under `/examples` are unauthenticated. `POST /examples/login` issues an access cookie, and only `GET /examples/orm-queries/users/with-authentication` requires that token; this demonstration does not provide authorization for the other routes or production-ready access control. Do not expose the examples to untrusted clients. Before adapting this starter for a business application, secure every route and follow the [deployment checklist](./docs/configuration.md).
-
-The checked-in configuration is for local examples only: it uses GOREST's SQLite default and enables both migrations and sample seeders (`Migration=true`, `Seeder=true`). Do not deploy these startup settings to production. Production application instances must not run the sample seeders or apply migrations automatically; use a controlled deployment migration step. See the [database guide](./docs/database.md) before selecting another driver or adapting the configuration for deployment.
-
-## Requirements
+## Requirements and quick start
 
 - Go `1.26.5` or newer.
-- SQLite for the default configuration; no external database service is required to start the examples.
+- A reachable MySQL server and a database for the application.
 
-Migration and seeder examples are provided for PostgreSQL, MySQL, Oracle, SQL Server, SQLite, MongoDB, and ScyllaDB. Their schema, query syntax, and transaction capabilities are not identical. See the [database guide](./docs/database.md) before switching drivers.
-
-## Quick start
-
-1. Review the local server and CORS settings in `app/config/server.go`.
-2. From the repository root, run:
-
-   ```sh
-   go run .
-   ```
-
-   Or run `make run`. The server listens at `http://127.0.0.1:3000`. Database migrations and seeders run at startup; the SQLite file is created at `app/database/gorest.db`.
-3. Try a read-only example:
-
-   ```sh
-   curl http://127.0.0.1:3000/examples/orm-queries/users
-   ```
-
-For complete setup steps, payload examples, and endpoint behavior, use [Getting started](./docs/getting-started.md) and the [API reference](./docs/api-reference.md).
-
-## Development checks
+Copy `.env.example` to `.env`, provide the MySQL database name, username, password, and appropriate TLS settings, then apply the MySQL migration and start the application:
 
 ```sh
-make test      # run all Go tests with per-test progress
-make check     # run go vet and all Go tests with progress and summaries
-make tool-versions # verify pinned Go, golangci-lint, and Gitleaks versions
-make lint      # pinned baseline golangci-lint checks (install separately)
-make lint-full # all configured linters, including the quality backlog
-make build     # build bin/gorest-api-starter
-make test-e2e          # run the complete isolated E2E matrix for all seven drivers
-make test-e2e-sqlite   # run the matrix for one driver (same targets exist for all drivers)
-make coverage     # generate SQLite E2E coverage.out and coverage.html
-make coverage-e2e # generate combined native-driver coverage (services required)
-make push          # secret-scan, then interactively sanitize, stage, commit, and optionally push
+cp .env.example .env
+# Edit .env with your MySQL settings.
+GOREST_DB_MIGRATION=true go run .
+GOREST_DB_MIGRATION=false go run .
 ```
 
-`make test` runs the standard Go suite without starting external database services. `make test-e2e` is the isolated database workflow: it runs the verification scenarios against disposable containers for all seven drivers, including native SQL routes for the five SQL drivers, native MongoDB routes, and native CQL routes for ScyllaDB. It requires Docker and uses additional time, disk, and memory, especially for Oracle. Driver-specific targets (`make test-e2e-postgres`, `make test-e2e-mysql`, `make test-e2e-oracle`, `make test-e2e-sqlserver`, `make test-e2e-mongo`, `make test-e2e-scylla`, and `make test-e2e-sqlite`) run one part of the same matrix. See the [testing guide](./docs/testing.md) for prerequisites and scenario coverage.
+The application loads `.env` when present and also supports environment-only startup. See [Getting started](./docs/getting-started.md) and [MySQL configuration](./docs/database.md) for the full setup.
 
-The automated database testing supports macOS and Linux. Windows is not currently in the verified testing scope.
+## Tests and coverage
 
-See the [testing and E2E guide](./docs/testing.md) for environment variables, coverage details, and test limitations. A passing test or build does not establish that every example works with every supported database driver.
+```sh
+make unit-test       # isolated unit tests; no database required
+make coverage        # unit coverage profile, text summary, and HTML report
+make test-integration # E2E requests against the explicitly configured MySQL test host
+make integration-report # save a human-readable E2E run report
+make integration-json  # save a machine-readable E2E run report
+```
 
-`make push` runs Gitleaks against the current working tree and Git history before sanitizing or staging. It then asks for confirmation before sanitizing, staging, committing, and pushing. Before staging, it temporarily blanks non-empty `Password`, `Secret`, `Token`, `APIKey`, `ClientSecret`, `AccessKey`, and `PrivateKey` string fields in `app/config/*.go`; it restores the working files after staging, so the commit contains the sanitized values while the local configuration remains unchanged. It stages all repository changes, requires a clean Git index at startup, and never force-pushes. Review the staged summary and your branch/remote before confirming. The sanitizer is a narrow helper; Gitleaks is the repository and history scanner.
+Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. They do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
+
+The coverage outputs and integration reports are generated locally under `coverage/`; rerun the documented commands to regenerate evidence for the current source and environment.
+
+GitHub Actions runs unit tests and coverage on pushes and pull requests. Its MySQL E2E job runs when the required external test database secrets are configured; see the [testing guide](./docs/testing.md#github-actions-ci).
+
+## Framework and security
+
+The [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) is the framework reference. For MySQL TLS, private-CA, and mTLS setup, follow the [MySQL configuration guide](./docs/database.md#configure-tls-private-cas-and-client-certificates) and verify that the chosen connector supports your database's certificate policy. Do not commit credentials, private keys, or certificates. The default Redis wiring remains optional and disabled by the starter's `.env.example`; the current user endpoints do not depend on Redis.
+
+For private vulnerability reporting and the project's security policy, see [SECURITY.md](./SECURITY.md).

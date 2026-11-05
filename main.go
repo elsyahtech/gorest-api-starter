@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	golog "log"
 	"os"
 
 	"github.com/elsyahtech/gorest"
@@ -17,7 +19,7 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
+	if err := loadDotEnv(); err != nil {
 		failConfiguration(err)
 	}
 
@@ -89,8 +91,14 @@ func main() {
 	app.Start()
 }
 
-func failConfiguration(err error) {
-	fmt.Fprintf(os.Stderr, "invalid application configuration: %v\n", err)
+func loadDotEnv() error {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
 
-	os.Exit(1)
+	return nil
+}
+
+func failConfiguration(err error) {
+	golog.Fatalf("invalid application configuration: %v", err)
 }

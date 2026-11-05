@@ -647,15 +647,4 @@ linters:
       tab-width: 1
   exclusions:
     rules:
-      - path: coba
-        linters:
-          - revive
-          - goconst
-          - govet
-          - errcheck
-          - ineffassign
-          - gocritic
-          - staticcheck
-          - dupl
-          - errorlint
           
