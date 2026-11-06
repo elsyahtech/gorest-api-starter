@@ -4,7 +4,6 @@ go 1.26.5
 
 require (
 	github.com/elsyahtech/gorest v1.1.20
-	github.com/go-sql-driver/mysql v1.10.1
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
@@ -19,6 +18,7 @@ require (
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/godror/godror v0.51.5 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
 	github.com/gofiber/schema v1.8.8 // indirect

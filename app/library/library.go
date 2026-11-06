@@ -2,25 +2,19 @@ package library
 
 import (
 	"github.com/elsyahtech/gorest"
-	"github.com/elsyahtech/gorest-api-starter/app/entity"
+	"github.com/elsyahtech/gorest-api-starter/app/model"
 )
 
 // UserLibrary contains user-related application logic.
 type UserLibrary struct {
 	App       *gorest.App
-	UserModel UserRepository
+	UserModel *model.UserModel
 }
 
 // NewUserLibrary creates a user library backed by the given model.
-func NewUserLibrary(app *gorest.App, userModel UserRepository) *UserLibrary {
+func NewUserLibrary(app *gorest.App, userModel *model.UserModel) *UserLibrary {
 	return &UserLibrary{
 		App:       app,
 		UserModel: userModel,
 	}
-}
-
-type UserRepository interface {
-	CreateUser(*entity.User) (string, int, error)
-	GetUserByEmail(string) (*entity.User, string, int, error)
-	GetUsers() (*[]entity.User, string, int, error)
 }

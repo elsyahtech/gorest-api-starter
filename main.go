@@ -31,31 +31,37 @@ func main() {
 		failConfiguration(err)
 	}
 
+	// Logger configuration
 	loggerConfig, err := config.LoggerConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
+	// Server configuration
 	serverConfig, err := config.ServerConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
+	// Database configuration
 	databaseConfig, err := config.DatabaseConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
+	// Redis configuration
 	redisConfig, err := config.RedisConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
+	// Filter (JWT) configuration
 	filterConfig, err := config.FilterConfig()
 	if err != nil {
 		failConfiguration(err)
 	}
 
+	// Monitoring configuration
 	monitoringConfig, err := config.MonitoringConfig()
 	if err != nil {
 		failConfiguration(err)
@@ -64,18 +70,18 @@ func main() {
 	// =====================================================================
 	// 2. Initialize application
 	// =====================================================================
-	app := gorest.New(appConfig)
+	app := gorest.New(*appConfig)
 
 	// =====================================================================
 	// 3. Register application services
 	// =====================================================================
 	app.Use(
-		log.Run(loggerConfig),
-		server.Run(serverConfig),
-		database.Run(databaseConfig),
-		redis.Run(redisConfig),
-		filter.Run(filterConfig),
-		monitoring.Run(monitoringConfig),
+		log.Run(*loggerConfig),
+		server.Run(*serverConfig),
+		database.Run(*databaseConfig),
+		redis.Run(*redisConfig),
+		filter.Run(*filterConfig),
+		monitoring.Run(*monitoringConfig),
 	)
 
 	// =====================================================================
@@ -83,6 +89,8 @@ func main() {
 	// =====================================================================
 	app.RegisterServices([]gorest.RouterRegistrar{
 		router.UserRouter,
+
+		// Add your route modules here.
 	})
 
 	// =====================================================================

@@ -64,17 +64,21 @@ service-account*.json
 *.sql.gz
 *.dump
 *.bak
+*.log
+*.tmp
+*.swp
+*.swo
 
-# Generated application artifacts
+# Ignore directories for build artifacts, logs, and temporary files
 /bin/
 /logs/
 /coverage/
 /app/database/var/
 /cert/
-*.log
-*.tmp
-*.swp
-*.swo
+/postgres-cert/
+/app/handler/logs/
+/app/router/logs/
+/integration-test/logs/
 
 # Editor/IDE
 .idea/

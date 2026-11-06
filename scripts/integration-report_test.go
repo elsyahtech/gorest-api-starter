@@ -98,7 +98,7 @@ func TestInstrumentedApplicationProducesCoverage(t *testing.T) {
 		"GOREST_SERVER_CERT_KEY_FILE":          "",
 		"GOREST_SERVER_ENABLE_PREFORK":         "false",
 		"GOREST_DB_DISABLE":                    "true",
-		"GOREST_DB_DRIVER":                     "mysql",
+		"GOREST_DB_DRIVER":                     "postgres",
 		"GOREST_DB_HOST":                       "127.0.0.1",
 		"GOREST_DB_PORT":                       "3306",
 		"GOREST_DB_NAME":                       "coverage_smoke_test",

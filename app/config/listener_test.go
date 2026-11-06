@@ -17,7 +17,7 @@ func TestServerListenerUsesGORESTDefaultsWhenEnvironmentIsEmpty(t *testing.T) {
 		t.Fatalf("ServerConfig() error = %v", err)
 	}
 
-	listener := server.Run(cfg).Listener
+	listener := server.Run(*cfg).Listener
 	if listener.Network != "tcp4" ||
 		listener.TLSMinVersion != tls.VersionTLS12 ||
 		listener.UnixSocketFileMode != 0o770 ||
@@ -31,7 +31,7 @@ func TestServerListenerUsesGORESTDefaultsWhenEnvironmentIsEmpty(t *testing.T) {
 		listener.PreforkRecoverInterval != 0 || listener.EnablePrefork || listener.EnablePrintRoutes {
 		t.Errorf("optional listener values = %+v, want empty or disabled", listener)
 	}
-	if _, _, err := server.New(&cfg); err != nil {
+	if _, _, err := server.New(cfg); err != nil {
 		t.Fatalf("server.New() error with empty optional listener values = %v", err)
 	}
 }
@@ -123,7 +123,7 @@ func TestServerListenerInvalidTLSCombinationIsRejectedByGOREST(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ServerConfig() error = %v", err)
 	}
-	if _, _, err := server.New(&cfg); err == nil {
+	if _, _, err := server.New(cfg); err == nil {
 		t.Fatal("server.New() succeeded with an incomplete TLS certificate pair")
 	}
 }

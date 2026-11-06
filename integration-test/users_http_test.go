@@ -28,42 +28,33 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
-	testConfig, err := loadMySQLTestConfig()
+func TestPostgreSQLUserEndpointsOverHTTP(t *testing.T) {
+	testConfig, err := loadPostgreSQLTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyMySQLTestConfig(t, testConfig)
+	applyPostgreSQLTestConfig(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
 		t.Fatalf("load test database configuration: %v", err)
 	}
-	if dbConfig.Driver != database.MYSQL || dbConfig.Name != testConfig.database {
-		t.Fatalf("database configuration is not the selected MySQL test database")
+	if dbConfig.Driver != database.POSTGRES || dbConfig.Name != testConfig.database {
+		t.Fatalf("database configuration is not the selected PostgreSQL test database")
 	}
 	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 15*time.Second)
-	testDB, message, err := database.New(databaseContext, &dbConfig, gorest.DefaultTimezone)
+	testDB, message, err := database.New(databaseContext, dbConfig, gorest.DefaultTimezone)
 	cancelDatabase()
 	if err != nil {
-		t.Fatalf("connect to configured MySQL test database (%s): %v", message, err)
+		t.Fatalf("connect to configured PostgreSQL test database (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
 		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close MySQL test database connection: %v", err)
+			t.Errorf("close PostgreSQL test database connection: %v", err)
 		}
 	})
-	requireUsersTable(t, testDB.SQL)
 	// Release the preflight connection before the application uses the test account.
 	testDB.SQL.SetMaxIdleConns(0)
-
-	testID := uuid.NewString()
-	testEmail := "integration+" + strings.ReplaceAll(testID, "-", "") + "@example.test"
-	testPassword := "integration-test-password"
-	cleanupUser(t, testDB.SQL, testID, testEmail)
-	t.Cleanup(func() {
-		cleanupUser(t, testDB.SQL, testID, testEmail)
-	})
 
 	signatureKeyBytes := make([]byte, 48)
 	if _, err := rand.Read(signatureKeyBytes); err != nil {
@@ -72,6 +63,16 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 	signatureKey := base64.RawURLEncoding.EncodeToString(signatureKeyBytes)
 	baseURL, stopApp := startApplication(t, testConfig, signatureKey)
 	defer stopApp()
+	requireUsersTable(t, testDB.SQL)
+	requirePostgreSQLSeedData(t, testDB.SQL)
+
+	testID := uuid.NewString()
+	testEmail := "integration+" + strings.ReplaceAll(testID, "-", "") + "@example.test"
+	testPassword := "integration-test-password"
+	cleanupUser(t, testDB.SQL, testID, testEmail)
+	t.Cleanup(func() {
+		cleanupUser(t, testDB.SQL, testID, testEmail)
+	})
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -94,7 +95,7 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		testEmail,
 		testPassword,
 	)
-	t.Run("creates a MySQL user", func(t *testing.T) {
+	t.Run("creates a PostgreSQL user", func(t *testing.T) {
 		response := requestJSON(t, client, http.MethodPost, baseURL+"/users/create", createRequest, "")
 		if response.status != http.StatusOK || response.json["success"] != true {
 			t.Fatalf("create response = (%d, %s), want HTTP 200 success", response.status, response.body)
@@ -103,11 +104,11 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		var storedID, storedEmail, storedPassword string
 		var active bool
 		err := testDB.SQL.QueryRow(
-			"SELECT id, email, password, is_active FROM users WHERE id = ?",
+			"SELECT id, email, password, is_active FROM users WHERE id = $1",
 			testID,
 		).Scan(&storedID, &storedEmail, &storedPassword, &active)
 		if err != nil {
-			t.Fatalf("read created user from MySQL: %v", err)
+			t.Fatalf("read created user from PostgreSQL: %v", err)
 		}
 		if storedID != testID || storedEmail != testEmail || !active || storedPassword == testPassword {
 			t.Fatalf("persisted user = (%q, %q, %t, password-set:%t), want created user with hashed password",
@@ -122,7 +123,7 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		}
 
 		var count int
-		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM users WHERE id = ?", testID).Scan(&count); err != nil {
+		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM users WHERE id = $1", testID).Scan(&count); err != nil {
 			t.Fatalf("count duplicate test user rows: %v", err)
 		}
 		if count != 1 {
@@ -225,12 +226,26 @@ func requireUsersTable(t *testing.T, db interface {
 
 	var tableCount int
 	if err := db.QueryRow(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'users'",
 	).Scan(&tableCount); err != nil {
-		t.Fatalf("check the MySQL users table: %v", err)
+		t.Fatalf("check the PostgreSQL users table: %v", err)
 	}
 	if tableCount != 1 {
-		t.Fatal("MySQL test database does not contain the users table; apply the MySQL migration before running integration tests")
+		t.Fatal("PostgreSQL test database does not contain the users table after running the migration")
+	}
+}
+
+func requirePostgreSQLSeedData(t *testing.T, db interface {
+	QueryRow(query string, args ...any) *sql.Row
+}) {
+	t.Helper()
+
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id LIKE '3746e32f-1bd6-4023-a608-f535696f5e%'").Scan(&count); err != nil {
+		t.Fatalf("verify PostgreSQL seed data: %v", err)
+	}
+	if count != 10 {
+		t.Fatalf("PostgreSQL seeder created %d sample users, want 10", count)
 	}
 }
 
@@ -239,17 +254,17 @@ func cleanupUser(t *testing.T, db interface {
 }, id, email string) {
 	t.Helper()
 
-	if _, err := db.Exec("DELETE FROM users WHERE id = ? AND email = ?", id, email); err != nil {
+	if _, err := db.Exec("DELETE FROM users WHERE id = $1 AND email = $2", id, email); err != nil {
 		t.Errorf("clean up integration user %s: %v", id, err)
 	}
 }
 
-func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
+func applyPostgreSQLTestConfig(t *testing.T, config postgresTestConfig) {
 	t.Helper()
 	for key, value := range map[string]string{
 		"GOREST_APP_ENV":                      "testing",
 		"GOREST_DB_DISABLE":                   "false",
-		"GOREST_DB_DRIVER":                    "mysql",
+		"GOREST_DB_DRIVER":                    database.POSTGRES,
 		"GOREST_DB_HOST":                      config.host,
 		"GOREST_DB_PORT":                      config.port,
 		"GOREST_DB_NAME":                      config.database,
@@ -259,15 +274,16 @@ func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
 		"GOREST_DB_CA_PATH":                   config.caPath,
 		"GOREST_DB_CERT_PATH":                 config.certPath,
 		"GOREST_DB_KEY_PATH":                  config.keyPath,
-		"GOREST_DB_MIGRATION":                 "false",
-		"GOREST_DB_SEEDER":                    "false",
+		"GOREST_DB_DIRECTORY":                 config.databaseDirectory,
+		"GOREST_DB_MIGRATION":                 "true",
+		"GOREST_DB_SEEDER":                    "true",
 		"GOREST_DB_ALLOW_INSECURE_PRODUCTION": "false",
 	} {
 		t.Setenv(key, value)
 	}
 }
 
-func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string) (string, func()) {
+func startApplication(t *testing.T, config postgresTestConfig, signatureKey string) (string, func()) {
 	t.Helper()
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")

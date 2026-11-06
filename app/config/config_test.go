@@ -167,47 +167,47 @@ var configurationEnvironmentKeys = []string{
 
 func TestStrLoadsEnvironmentValueAndUsesDefaultWhenEmpty(t *testing.T) {
 	t.Setenv("CONFIG_TEST_STRING", "  configured value  ")
-	if got := str("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
+	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
 		t.Fatalf("str() = %q, want trimmed environment value", got)
 	}
 
 	t.Setenv("CONFIG_TEST_STRING", "  ")
-	if got := str("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
+	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
 		t.Fatalf("str() with blank environment value = %q, want fallback", got)
 	}
 }
 
 func TestStrToIntLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
 	t.Setenv("CONFIG_TEST_INTEGER", " 42 ")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
-		t.Fatalf("strToInt() = %d, want 42", got)
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
+		t.Fatalf("envStrToInt() = %d, want 42", got)
 	}
 
 	t.Setenv("CONFIG_TEST_INTEGER", "invalid")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
-		t.Fatalf("strToInt() with invalid environment value = %d, want default 10", got)
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+		t.Fatalf("envStrToInt() with invalid environment value = %d, want default 10", got)
 	}
 
 	t.Setenv("CONFIG_TEST_INTEGER", " ")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
-		t.Fatalf("strToInt() with blank environment value = %d, want default 10", got)
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+		t.Fatalf("envStrToInt() with blank environment value = %d, want default 10", got)
 	}
 }
 
 func TestStrToTimeDurationLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
 	t.Setenv("CONFIG_TEST_DURATION", " 2m ")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
-		t.Fatalf("strToTimeDuration() = %s, want 2m", got)
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
+		t.Fatalf("envStrToTimeDuration() = %s, want 2m", got)
 	}
 
 	t.Setenv("CONFIG_TEST_DURATION", "invalid")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
-		t.Fatalf("strToTimeDuration() with invalid value = %s, want default 1s", got)
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+		t.Fatalf("envStrToTimeDuration() with invalid value = %s, want default 1s", got)
 	}
 
 	t.Setenv("CONFIG_TEST_DURATION", " ")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
-		t.Fatalf("strToTimeDuration() with blank value = %s, want default 1s", got)
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+		t.Fatalf("envStrToTimeDuration() with blank value = %s, want default 1s", got)
 	}
 }
 
@@ -230,25 +230,25 @@ func TestToStrArrayUsesEnvironmentValueAndDefaults(t *testing.T) {
 	})
 
 	defaultValue := []string{"default"}
-	if got := toStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
-		t.Fatalf("toStrArray() with unset variable = %v, want %v", got, defaultValue)
+	if got := envToStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
+		t.Fatalf("envToStrArray() with unset variable = %v, want %v", got, defaultValue)
 	}
 
 	t.Setenv(key, " first, second ,, third ")
-	got := toStrArray(key, defaultValue)
+	got := envToStrArray(key, defaultValue)
 	want := []string{"first", "second", "third"}
 	if len(got) != len(want) {
-		t.Fatalf("toStrArray() = %v, want %v", got, want)
+		t.Fatalf("envToStrArray() = %v, want %v", got, want)
 	}
 	for i := range want {
 		if got[i] != want[i] {
-			t.Fatalf("toStrArray() = %v, want %v", got, want)
+			t.Fatalf("envToStrArray() = %v, want %v", got, want)
 		}
 	}
 
 	t.Setenv(key, " ")
-	if got := toStrArray(key, defaultValue); got == nil || len(got) != 0 {
-		t.Fatalf("toStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
+	if got := envToStrArray(key, defaultValue); got == nil || len(got) != 0 {
+		t.Fatalf("envToStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
 	}
 }
 
@@ -296,7 +296,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "mysql-starter")
+	t.Setenv("GOREST_APP_NAME", "postgres-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -307,7 +307,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "mysql-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "postgres-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -727,15 +727,15 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	if cfg.Limiter.Max != 50 || cfg.Limiter.Expiration != time.Minute {
 		t.Errorf("rate limiter config = %+v, want defaults", cfg.Limiter)
 	}
-	if _, _, err := gorestserver.New(&cfg); err != nil {
+	if _, _, err := gorestserver.New(cfg); err != nil {
 		t.Fatalf("server.New() error with blank optional config values = %v", err)
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToMySQL(t *testing.T) {
+func TestDatabaseConfigRequiresCredentialsAndDefaultsToPostgreSQL(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a MySQL username and password")
+		t.Fatal("DatabaseConfig() succeeded without a PostgreSQL username and password")
 	}
 
 	t.Setenv("GOREST_DB_USER", "integration-user")
@@ -744,21 +744,22 @@ func TestDatabaseConfigRequiresCredentialsAndDefaultsToMySQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "mysql" || cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want MySQL and configured credentials", cfg)
+	if cfg.Driver != "postgres" || cfg.Port != "5432" ||
+		cfg.Username != "integration-user" || cfg.Password != "integration-password" {
+		t.Errorf("DatabaseConfig() = %+v, want PostgreSQL defaults and configured credentials", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonMySQLDrivers(t *testing.T) {
+func TestDatabaseConfigRejectsNonPostgreSQLDrivers(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	t.Setenv("GOREST_DB_USER", "integration-user")
 	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 
-	for _, driver := range []string{"postgres", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
+	for _, driver := range []string{"mysql", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-MySQL driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-PostgreSQL driver %q", driver)
 			}
 		})
 	}
@@ -766,7 +767,7 @@ func TestDatabaseConfigRejectsNonMySQLDrivers(t *testing.T) {
 
 func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
+	t.Setenv("GOREST_DB_DRIVER", "postgres")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
 	t.Setenv("GOREST_DB_TLS", "disable")
@@ -786,42 +787,44 @@ func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigAllowsMySQLTLSWithoutCAPath(t *testing.T) {
+func TestDatabaseConfigMapsPostgreSQLTLSWithoutClientCertificate(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
+	t.Setenv("GOREST_DB_DRIVER", "postgres")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "true")
+	t.Setenv("GOREST_DB_TLS", "verify-full")
 	t.Setenv("GOREST_DB_CERT_PATH", "")
+	t.Setenv("GOREST_DB_KEY_PATH", "")
 	t.Setenv("GOREST_DB_CA_PATH", "")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL TLS and no CA path error = %v", err)
+		t.Fatalf("DatabaseConfig() with PostgreSQL server TLS error = %v", err)
 	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" {
-		t.Errorf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q), want TLS enabled without CA or client certificate",
-			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath)
+	if cfg.Driver != "postgres" || cfg.TLS != "verify-full" ||
+		cfg.SSLCAPath != "" || cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
+		t.Errorf("PostgreSQL TLS fields = (driver:%q, TLS:%q, CA:%q, cert:%q, key:%q), want verified server TLS without client credentials",
+			cfg.Driver, cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
 	}
 }
 
-func TestDatabaseConfigMapsMySQLMTLSCertificatePaths(t *testing.T) {
+func TestDatabaseConfigMapsPostgreSQLServerCAWithoutClientCertificate(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
+	t.Setenv("GOREST_DB_DRIVER", "postgres")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "true")
+	t.Setenv("GOREST_DB_TLS", "verify-full")
 	t.Setenv("GOREST_DB_CA_PATH", "/test/ca.pem")
-	t.Setenv("GOREST_DB_CERT_PATH", "/test/client-cert.pem")
-	t.Setenv("GOREST_DB_KEY_PATH", "/test/client-key.pem")
+	t.Setenv("GOREST_DB_CERT_PATH", "")
+	t.Setenv("GOREST_DB_KEY_PATH", "")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL mTLS paths error = %v", err)
+		t.Fatalf("DatabaseConfig() with PostgreSQL CA path error = %v", err)
 	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "/test/ca.pem" ||
-		cfg.SSLCertPath != "/test/client-cert.pem" || cfg.SSLKeyPath != "/test/client-key.pem" {
-		t.Fatalf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want configured mTLS paths",
+	if cfg.TLS != "verify-full" || cfg.SSLCAPath != "/test/ca.pem" ||
+		cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
+		t.Fatalf("PostgreSQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want server CA without client credentials",
 			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
 	}
 }

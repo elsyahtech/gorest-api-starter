@@ -8,9 +8,9 @@ The sample uses GOREST v1.1.20. Application settings use `GOREST_APP_*`; the HTT
 
 Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.20 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.20/docs/configuration.md).
 
-## MySQL
+## PostgreSQL
 
-MySQL connection variables are documented in the [MySQL configuration guide](./database.md). GOREST v1.1.20 supports verified server TLS, custom CA files, and client certificates for mTLS through the database configuration. Follow the guide to set the required CA and client key pair.
+PostgreSQL connection variables are documented in the [PostgreSQL configuration guide](./database.md). Use `GOREST_DB_TLS=verify-full` to verify the server certificate and hostname. Configure `GOREST_DB_CA_PATH` for a private server CA, and configure both client certificate paths when the server requires mTLS. The PostgreSQL server must also trust and require client certificates; client-side settings do not enable server-side enforcement.
 
 ## Redis (optional)
 
@@ -39,7 +39,7 @@ GOREST_REDIS_CERT_PATH=/run/secrets/redis-client.pem
 GOREST_REDIS_KEY_PATH=/run/secrets/redis-client-key.pem
 ```
 
-Mount certificate files as secrets with read access limited to the application account. Do not commit credentials, private keys, or certificates. The starter passes these settings to GOREST using `redis.Run(redisConfig)`. See the [GOREST v1.1.20 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.20/docs/configuration.md) for pool, timeout, retry, and TLS options. See [Testing and coverage](./testing.md) for optional connectivity checks.
+Mount certificate files as secrets with read access limited to the application account. Do not commit credentials, private keys, or certificates. The starter's `config.RedisConfig()` returns a pointer, which `main.go` dereferences when passing the configuration to GOREST with `redis.Run(*redisConfig)`. See the [GOREST configuration guide](https://github.com/elsyahtech/gorest/blob/main/docs/configuration.md) for pool, timeout, retry, and TLS options. See [Testing and coverage](./testing.md) for optional connectivity checks.
 
 ## Authentication and sample limits
 

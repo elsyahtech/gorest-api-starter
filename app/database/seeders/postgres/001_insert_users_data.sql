@@ -2,71 +2,71 @@ INSERT INTO users (id, email, password, is_active, created_at)
 VALUES
 (
     '3746e32f-1bd6-4023-a608-f535696f5e01',
-    'test1@mail.com',
+    'admin1@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1, 
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e02',
-    'test2@mail.com',
+    'admin2@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1,
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e03',
-    'test3@mail.com',
+    'admin3@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1, 
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e04',
-    'test4@mail.com',
+    'admin4@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1,
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e05',
-    'test5@mail.com',
+    'admin5@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1, 
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e06',
-    'test6@mail.com',
+    'admin6@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1,
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e07',
-    'test7@mail.com',
+    'admin7@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1, 
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e08',
-    'test8@mail.com',
+    'admin8@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1,
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e09',
-    'test9@mail.com',
+    'admin9@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1, 
-     NOW()
+    TRUE,
+    NOW()
 ),
 (
     '3746e32f-1bd6-4023-a608-f535696f5e10',
-    'test10@mail.com',
+    'admin10@mail.com',
     '$2a$12$eXampleHashedPasswordStringForTestingOnly',
-    1,
-     NOW()
+    TRUE,
+    NOW()
 );
