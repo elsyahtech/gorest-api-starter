@@ -64,18 +64,18 @@ func main() {
 	// =====================================================================
 	// 2. Initialize application
 	// =====================================================================
-	app := gorest.New(appConfig)
+	app := gorest.New(*appConfig)
 
 	// =====================================================================
 	// 3. Register application services
 	// =====================================================================
 	app.Use(
-		log.Run(loggerConfig),
-		server.Run(serverConfig),
-		database.Run(databaseConfig),
-		redis.Run(redisConfig),
-		filter.Run(filterConfig),
-		monitoring.Run(monitoringConfig),
+		log.Run(*loggerConfig),
+		server.Run(*serverConfig),
+		database.Run(*databaseConfig),
+		redis.Run(*redisConfig),
+		filter.Run(*filterConfig),
+		monitoring.Run(*monitoringConfig),
 	)
 
 	// =====================================================================
@@ -83,6 +83,8 @@ func main() {
 	// =====================================================================
 	app.RegisterServices([]gorest.RouterRegistrar{
 		router.UserRouter,
+
+		// Add more route modules here.
 	})
 
 	// =====================================================================

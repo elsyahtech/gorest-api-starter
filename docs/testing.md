@@ -1,19 +1,20 @@
 # Testing and coverage
 
-This guide describes the test strategy for the active MySQL user API and the GOREST services it uses. Unit tests are isolated and do not connect to external services. HTTP E2E tests build and start the application, send requests, and use a separately configured external MySQL test database. Optional direct integration tests verify MySQL mTLS and Redis against explicitly configured external test services. No Docker or local disposable database is used.
+This guide describes the test strategy for the active MySQL user API and the GOREST services it uses. Unit tests are isolated and do not connect to external services. The tagged integration suite verifies direct library operations and builds and starts the application for HTTP E2E requests against a separately configured external MySQL test database. MySQL mTLS and Redis checks run when their external test-service settings are configured. No Docker or local disposable database is used.
 
 ## Test layout
 
 ```text
 app/
   config/*_test.go          configuration and validation tests
-  handler/*_test.go         HTTP handler unit tests with a stub use case
-  library/*_test.go         user business-logic unit tests with a stub repository
+  handler/                  HTTP handlers (behavior exercised by HTTP E2E tests)
+  library/*_test.go         validation tests that do not require a database
   model/*_test.go           model input guards
   router/*_test.go          route registration and authentication wiring
   view/*_test.go            entity-to-response mapping tests
 integration-test/
   config.go                 test-only environment and database-safety checks
+  user_library_test.go      user library behavior against MySQL
   users_http_test.go        HTTP E2E flow against the running application
   mysql_mtls_test.go        optional MySQL client-certificate verification
   redis_integration_test.go optional real Redis service test
@@ -34,12 +35,12 @@ make unit-test
 go test ./... -count=1
 ```
 
-Examples of isolated unit checks include password hashing before repository persistence, rejected invalid model inputs, handler request/response behavior with stubs, and public response mapping that omits password fields. The tests do not claim to validate MySQL connectivity or SQL behavior.
+Examples of isolated unit checks include rejected invalid library/model inputs, configuration validation, route registration and authentication wiring, and public response mapping that omits password fields. Password hashing, persistence, login rejection, and user listing through the library are verified against MySQL by `TestMySQLUserLibraryAgainstDatabase`; HTTP request and response behavior is verified by `TestMySQLUserEndpointsOverHTTP`.
 
 ## Configure the external MySQL integration test
 
 1. Prepare a dedicated MySQL test database on the host/IP and port to be tested. The schema name must end with `_test` or `_testing`; for example, `gorest_starter_test`.
-2. Apply the MySQL migration to that test schema and ensure the `users` table exists. The test does not run migrations, seed data, or drop tables.
+2. The library and HTTP integration tests apply the up migration automatically. It creates the `users` table if needed and records migration state; it does not drop tables or seed data. Use a dedicated test schema and an account permitted to create the table and migration metadata.
 3. Use the existing `.env` copied from `.env.example` and fill in the `GOREST_TEST_MYSQL_*` fields there. Alternatively, export those variables in the shell. Do not create a second integration environment file. Missing test connection values fall back to `GOREST_DB_*` only when `GOREST_APP_ENV` is `development`, `test`, or `testing`, the driver is MySQL, and the database is enabled. Prefer explicit test connection values to keep the test target unambiguous.
 4. Set `GOREST_TEST_MYSQL_CONFIRM_DATABASE` to exactly the configured test database name. This is a required explicit opt-in before test data can be written.
 5. Ensure the test account can insert, read, and delete only the intended test data.
@@ -80,7 +81,7 @@ To run the Redis integration test in CI, configure the optional `GOREST_TEST_RED
 
 To run the Redis mTLS check in CI, configure the optional `GOREST_TEST_REDIS_MTLS_HOST`, `DATABASE`, `CA_PEM`, `CLIENT_CERT_PEM`, and `CLIENT_KEY_PEM` secrets; `PORT` defaults to `6379`, and `USER` / `PASSWORD` are needed only when Redis authentication is enabled. This must be an endpoint configured to require client certificates. The workflow writes the CA and client key pair to restricted-permission temporary files. See [Redis TLS and mTLS configuration](./configuration.md#use-a-private-ca-or-mutual-tls) for client-side setup and certificate roles.
 
-Before enabling the job, provision a dedicated non-production database and its `users` table, verify that GitHub-hosted runners can reach the database, and grant the test account only the permissions needed by the test. The test does not create schema or tables. Store credentials and the PEM CA contents as GitHub Actions secrets rather than workflow literals; see GitHub's [using secrets in GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions) guide. GOREST v1.1.20 supports TLS with system roots or a configured CA and can present a configured client certificate for mTLS; see [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates).
+Before enabling the job, provision a dedicated non-production database, verify that GitHub-hosted runners can reach it, and grant the test account permission to create the `users` table and migration metadata. The integration test applies the up migration automatically; it does not drop tables or seed data. Store credentials and the PEM CA contents as GitHub Actions secrets rather than workflow literals; see GitHub's [using secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) guide. GOREST v1.1.20 supports TLS with system roots or a configured CA and can present a configured client certificate for mTLS; see [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates).
 
 If the required secrets are unavailable, GitHub skips the E2E job; it does not substitute a local or production database. A skipped job means E2E was not run and is not evidence that the HTTP flow passed. This commonly applies to pull requests from forks, for which GitHub does not expose repository secrets to the workflow. See GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request) documentation for the `pull_request` event's secret-access behavior. Configure repository Actions secrets for a dedicated non-production database according to your project's access policy; do not weaken the workflow's database safety checks to make secrets available.
 

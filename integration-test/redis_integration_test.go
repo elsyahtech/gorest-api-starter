@@ -40,7 +40,7 @@ func TestGORESTRedisServiceAgainstConfiguredInstance(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	serviceConfig := redis.Run(redisConfig)
+	serviceConfig := redis.Run(*redisConfig)
 	service, message, err := redis.New(ctx, &serviceConfig)
 	if err != nil {
 		t.Fatalf("initialize GOREST Redis service (%s): %v", message, err)

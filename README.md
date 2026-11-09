@@ -1,6 +1,6 @@
 # GOREST MySQL API Starter
 
-A MySQL-focused application starter built with [GOREST](https://github.com/elsyahtech/gorest/tree/main). It demonstrates a small user API with authentication, password hashing, a MySQL data-access layer, automated unit tests, and opt-in HTTP integration tests against a separately configured MySQL test database.
+A MySQL-focused application starter built with [GOREST](https://github.com/elsyahtech/gorest/tree/main). It demonstrates a small user API with authentication, password hashing, a MySQL data-access layer, automated unit tests, and opt-in library and HTTP integration tests against a separately configured MySQL test database.
 
 ## Documentation
 
@@ -37,11 +37,11 @@ The application loads `.env` when present and also supports environment-only sta
 ```sh
 make unit-test       # isolated unit tests; no database required
 make coverage        # unit coverage profile, text summary, and HTML report
-make test-integration # E2E requests against the explicitly configured MySQL test host
-make integration-reports # one E2E run: readable and JSON reports plus app coverage
+make test-integration # MySQL library/HTTP tests, plus configured TLS/mTLS and Redis checks
+make integration-reports # one integration run: readable and JSON reports plus app coverage
 ```
 
-Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. The optional Redis integration test uses the `GOREST_REDIS_*` settings only when Redis is explicitly enabled; point these at a non-production test instance. Tests do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
+Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. The library and HTTP tests apply the up migration if needed, without dropping tables or seeding data. MySQL mTLS and Redis checks run when their corresponding external-service settings are configured; point them at non-production test services. Tests do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
 
 The coverage outputs and integration reports are generated locally under `coverage/`; rerun the documented commands to regenerate evidence for the current source and environment. The integration report command runs E2E once and generates both report formats and an application coverage profile.
 

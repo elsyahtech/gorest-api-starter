@@ -167,46 +167,46 @@ var configurationEnvironmentKeys = []string{
 
 func TestStrLoadsEnvironmentValueAndUsesDefaultWhenEmpty(t *testing.T) {
 	t.Setenv("CONFIG_TEST_STRING", "  configured value  ")
-	if got := str("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
+	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
 		t.Fatalf("str() = %q, want trimmed environment value", got)
 	}
 
 	t.Setenv("CONFIG_TEST_STRING", "  ")
-	if got := str("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
+	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
 		t.Fatalf("str() with blank environment value = %q, want fallback", got)
 	}
 }
 
 func TestStrToIntLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
 	t.Setenv("CONFIG_TEST_INTEGER", " 42 ")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
 		t.Fatalf("strToInt() = %d, want 42", got)
 	}
 
 	t.Setenv("CONFIG_TEST_INTEGER", "invalid")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
 		t.Fatalf("strToInt() with invalid environment value = %d, want default 10", got)
 	}
 
 	t.Setenv("CONFIG_TEST_INTEGER", " ")
-	if got := strToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
+	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
 		t.Fatalf("strToInt() with blank environment value = %d, want default 10", got)
 	}
 }
 
 func TestStrToTimeDurationLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
 	t.Setenv("CONFIG_TEST_DURATION", " 2m ")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
 		t.Fatalf("strToTimeDuration() = %s, want 2m", got)
 	}
 
 	t.Setenv("CONFIG_TEST_DURATION", "invalid")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
 		t.Fatalf("strToTimeDuration() with invalid value = %s, want default 1s", got)
 	}
 
 	t.Setenv("CONFIG_TEST_DURATION", " ")
-	if got := strToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
+	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
 		t.Fatalf("strToTimeDuration() with blank value = %s, want default 1s", got)
 	}
 }
@@ -230,12 +230,12 @@ func TestToStrArrayUsesEnvironmentValueAndDefaults(t *testing.T) {
 	})
 
 	defaultValue := []string{"default"}
-	if got := toStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
+	if got := envToStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
 		t.Fatalf("toStrArray() with unset variable = %v, want %v", got, defaultValue)
 	}
 
 	t.Setenv(key, " first, second ,, third ")
-	got := toStrArray(key, defaultValue)
+	got := envToStrArray(key, defaultValue)
 	want := []string{"first", "second", "third"}
 	if len(got) != len(want) {
 		t.Fatalf("toStrArray() = %v, want %v", got, want)
@@ -247,8 +247,8 @@ func TestToStrArrayUsesEnvironmentValueAndDefaults(t *testing.T) {
 	}
 
 	t.Setenv(key, " ")
-	if got := toStrArray(key, defaultValue); got == nil || len(got) != 0 {
-		t.Fatalf("toStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
+	if got := envToStrArray(key, defaultValue); got == nil || len(got) != 0 {
+		t.Fatalf("envToStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
 	}
 }
 
@@ -727,7 +727,7 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	if cfg.Limiter.Max != 50 || cfg.Limiter.Expiration != time.Minute {
 		t.Errorf("rate limiter config = %+v, want defaults", cfg.Limiter)
 	}
-	if _, _, err := gorestserver.New(&cfg); err != nil {
+	if _, _, err := gorestserver.New(cfg); err != nil {
 		t.Fatalf("server.New() error with blank optional config values = %v", err)
 	}
 }

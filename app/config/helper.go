@@ -11,30 +11,12 @@ import (
 	"github.com/elsyahtech/gorest"
 )
 
-func envString(key string) string {
+func str(key string) string {
 	return strings.TrimSpace(os.Getenv(key))
 }
 
-func envDuration(key string) (time.Duration, error) {
-	value := envString(key)
-	if value == "" {
-		return 0, nil
-	}
-
-	duration, err := time.ParseDuration(value)
-	if err != nil {
-		return 0, fmt.Errorf("%s must be a valid Go duration: %w", key, err)
-	}
-
-	if duration < 0 {
-		return 0, fmt.Errorf("%s cannot be negative", key)
-	}
-
-	return duration, nil
-}
-
 func envNonNegativeInt(key string) (int, error) {
-	value := envString(key)
+	value := str(key)
 	if value == "" {
 		return 0, nil
 	}
@@ -48,7 +30,7 @@ func envNonNegativeInt(key string) (int, error) {
 }
 
 func envFileMode(key string) (os.FileMode, error) {
-	value := envString(key)
+	value := str(key)
 	if value == "" {
 		return 0, nil
 	}
@@ -62,7 +44,7 @@ func envFileMode(key string) (os.FileMode, error) {
 }
 
 func envTLSMinVersion(key string) (uint16, error) {
-	switch strings.ToLower(envString(key)) {
+	switch strings.ToLower(str(key)) {
 	case "":
 		return 0, nil
 	case "1.2", "tls1.2", "tlsv1.2":
@@ -74,8 +56,8 @@ func envTLSMinVersion(key string) (uint16, error) {
 	}
 }
 
-func str(key, defaultValue string) string {
-	value := envString(key)
+func envStr(key, defaultValue string) string {
+	value := str(key)
 	if value == "" {
 		return defaultValue
 	}
@@ -83,14 +65,14 @@ func str(key, defaultValue string) string {
 	return value
 }
 
-func strPtr(key, defaultValue string) *string {
-	value := str(key, defaultValue)
+func envStrPtr(key, defaultValue string) *string {
+	value := envStr(key, defaultValue)
 
 	return &value
 }
 
-func strToInt(key string, defaultValue int) int {
-	value := envString(key)
+func envStrToInt(key string, defaultValue int) int {
+	value := str(key)
 	if value == "" {
 		return defaultValue
 	}
@@ -103,21 +85,25 @@ func strToInt(key string, defaultValue int) int {
 	return parsed
 }
 
-func strToTimeDuration(key string, defaultValue time.Duration) time.Duration {
-	value := envString(key)
+func envStrToTimeDuration(key string, defaultValue time.Duration) (time.Duration, error) {
+	value := str(key)
 	if value == "" {
-		return defaultValue
+		return defaultValue, nil
 	}
 
-	parsed, err := time.ParseDuration(value)
+	duration, err := time.ParseDuration(value)
 	if err != nil {
-		return defaultValue
+		return defaultValue, fmt.Errorf("%s must be a valid Go duration: %w", key, err)
 	}
 
-	return parsed
+	if duration < 0 {
+		return defaultValue, fmt.Errorf("%s cannot be negative", key)
+	}
+
+	return duration, nil
 }
 
-func toStrArray(key string, defaultValue []string) []string {
+func envToStrArray(key string, defaultValue []string) []string {
 	value, ok := os.LookupEnv(key)
 	if !ok {
 		return defaultValue
@@ -142,7 +128,7 @@ func toStrArray(key string, defaultValue []string) []string {
 	return result
 }
 
-func strToBool(key string, defaultValue bool) (bool, error) {
+func envStrToBool(key string, defaultValue bool) (bool, error) {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
 		return defaultValue, nil

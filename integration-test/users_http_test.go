@@ -33,7 +33,7 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyMySQLTestConfig(t, testConfig)
+	prepareMySQLIntegrationSchema(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		t.Fatalf("database configuration is not the selected MySQL test database")
 	}
 	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 15*time.Second)
-	testDB, message, err := database.New(databaseContext, &dbConfig, gorest.DefaultTimezone)
+	testDB, message, err := database.New(databaseContext, dbConfig, gorest.DefaultTimezone)
 	cancelDatabase()
 	if err != nil {
 		t.Fatalf("connect to configured MySQL test database (%s): %v", message, err)

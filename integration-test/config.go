@@ -6,8 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"testing"
 
+	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest-api-starter/app/config"
+	"github.com/elsyahtech/gorest/database"
+	"github.com/elsyahtech/gorest/log"
 	"github.com/joho/godotenv"
 )
 
@@ -133,6 +139,34 @@ func loadMySQLTestConfig() (mysqlTestConfig, error) {
 	}
 
 	return config, nil
+}
+
+func prepareMySQLIntegrationSchema(t *testing.T, testConfig mysqlTestConfig) {
+	t.Helper()
+	applyMySQLTestConfig(t, testConfig)
+
+	databaseConfig, err := config.DatabaseConfig()
+	if err != nil {
+		t.Fatalf("load MySQL migration configuration: %v", err)
+	}
+	databaseDirectory, err := filepath.Abs(filepath.Join("..", "app", "database"))
+	if err != nil {
+		t.Fatalf("resolve MySQL migration directory: %v", err)
+	}
+	databaseConfig.DatabaseDirectory = databaseDirectory
+	databaseConfig.Migration = true
+	databaseConfig.Seeder = false
+
+	app := gorest.New(gorest.ConfigDefault)
+	app.Use(log.Run(log.ConfigDefault), database.Run(*databaseConfig))
+	t.Cleanup(func() {
+		if _, _, err := app.Close(); err != nil {
+			t.Errorf("close MySQL migration application: %v", err)
+		}
+	})
+	if err := app.RunDatabaseStartupTasks(); err != nil {
+		t.Fatalf("apply MySQL integration migration: %v", err)
+	}
 }
 
 func (config mysqlTestConfig) appEnvironment(serverPort, logDirectory, signatureKey string) map[string]string {
