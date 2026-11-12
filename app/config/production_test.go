@@ -55,6 +55,8 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_REDIS_SSL_CERT_PATH",
 	"GOREST_REDIS_SSL_KEY_PATH",
 	"GOREST_FILTER_SIGNATURE_KEY",
+	"GOREST_HARDENING_ENABLE",
+	"GOREST_HARDENING_ALLOWED_IPS",
 	"GOREST_HTTP_METRICS_ALLOWED_IPS",
 	"GOREST_DISABLE_MONITORING_ENDPOINTS",
 	"GOREST_ENABLE_PER_ROUTE_HTTP_METRICS",
@@ -87,13 +89,13 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 	if cfg.Issuer != "your-issuer" {
 		t.Errorf("LoadFilters().Issuer = %q, want your-issuer", cfg.Issuer)
 	}
-	if cfg.CookieSameSite != "Lax" || cfg.CookiePath != "/" || cfg.CookieDomain != "" {
+	if cfg.CookieConfig.CookieSameSite != "Lax" || cfg.CookieConfig.CookiePath != "/" || cfg.CookieConfig.CookieDomain != "" {
 		t.Errorf("LoadFilters() cookie scope = (%q, %q, %q), want (Lax, /, empty)",
-			cfg.CookieSameSite, cfg.CookiePath, cfg.CookieDomain)
+			cfg.CookieConfig.CookieSameSite, cfg.CookieConfig.CookiePath, cfg.CookieConfig.CookieDomain)
 	}
-	if !cfg.CookieSecure || !cfg.CookieHTTPOnly || cfg.CookieSessionOnly {
+	if !cfg.CookieConfig.CookieSecure || !cfg.CookieConfig.CookieHTTPOnly || cfg.CookieConfig.CookieSessionOnly {
 		t.Errorf("LoadFilters() cookie flags = (secure:%t, httpOnly:%t, sessionOnly:%t), want (true, true, false)",
-			cfg.CookieSecure, cfg.CookieHTTPOnly, cfg.CookieSessionOnly)
+			cfg.CookieConfig.CookieSecure, cfg.CookieConfig.CookieHTTPOnly, cfg.CookieConfig.CookieSessionOnly)
 	}
 	if cfg.LoggerConfig.DisableLogging ||
 		len(cfg.LoggerConfig.EnabledEvents) != 1 ||
@@ -171,8 +173,8 @@ func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 	t.Run("defaults an empty value to development", func(t *testing.T) {
 		isolateConfigurationEnvironment(t)
 		t.Setenv("APP_ENV", "")
-		if got := Environment(); got != gorest.Development {
-			t.Fatalf("Environment() = %q, want %q", got, gorest.Development)
+		if got := runtimeEnvironment(); got != gorest.Development {
+			t.Fatalf("runtimeEnvironment() = %q, want %q", got, gorest.Development)
 		}
 		if err := validateEnvironment(); err != nil {
 			t.Fatalf("validateEnvironment() error = %v", err)

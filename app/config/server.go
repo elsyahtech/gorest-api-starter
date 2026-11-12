@@ -1,14 +1,13 @@
 package config
 
 import (
-	"crypto/tls"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/elsyahtech/gorest"
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/server"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -42,8 +41,10 @@ func LoadServer() (server.Config, error) {
 	port := 3000
 
 	if value, ok := os.LookupEnv("GOREST_SERVER_PORT"); ok {
-		parsed, err := strconv.Atoi(strings.TrimSpace(value))
-
+		if strings.TrimSpace(value) == "" {
+			return server.Config{}, fmt.Errorf("GOREST_SERVER_PORT must be an integer between 1 and 65535")
+		}
+		parsed, err := goresthelper.ReadEnvironmentIntegerWithDefault("GOREST_SERVER_PORT", port)
 		if err != nil || parsed < 1 || parsed > 65535 {
 			return server.Config{}, fmt.Errorf("GOREST_SERVER_PORT must be an integer between 1 and 65535")
 		}
@@ -51,14 +52,14 @@ func LoadServer() (server.Config, error) {
 		port = parsed
 	}
 
-	host := envString("GOREST_SERVER_HOST", "127.0.0.1")
-	origins := csvEnv("GOREST_CORS_ORIGINS")
+	host := strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_HOST", "127.0.0.1"))
+	origins := goresthelper.ReadEnvironmentStringSliceWithDefault("GOREST_CORS_ORIGINS", []string{})
 
 	if len(origins) == 0 {
 		origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
 
-	if Environment() == gorest.Production {
+	if runtimeEnvironment() == gorest.Production {
 		if err := requireProductionEnv("GOREST_SERVER_HOST"); err != nil {
 			return server.Config{}, err
 		}
@@ -71,7 +72,7 @@ func LoadServer() (server.Config, error) {
 			return server.Config{}, err
 		}
 
-		if len(csvEnv("GOREST_CORS_ORIGINS")) == 0 {
+		if len(goresthelper.ReadEnvironmentStringSliceWithDefault("GOREST_CORS_ORIGINS", []string{})) == 0 {
 			return server.Config{}, fmt.Errorf("GOREST_CORS_ORIGINS must contain at least one origin when APP_ENV=production")
 		}
 	}
@@ -130,124 +131,59 @@ func LoadServer() (server.Config, error) {
 
 func loadListenerConfig() (server.ListenerConfig, error) {
 	listener := server.ListenerConfig{
-		Network:           envString("GOREST_SERVER_LISTENER_NETWORK", ""),
-		TLSCertFile:       envString("GOREST_SERVER_CERT_FILE", ""),
-		TLSCertKeyFile:    envString("GOREST_SERVER_CERT_KEY_FILE", ""),
-		TLSCertClientFile: envString("GOREST_SERVER_CERT_CLIENT_FILE", ""),
-		UnixSocketPath:    envString("GOREST_SERVER_UNIX_SOCKET_PATH", ""),
+		Network:           strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_LISTENER_NETWORK", "")),
+		TLSCertFile:       strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_CERT_FILE", "")),
+		TLSCertKeyFile:    strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_CERT_KEY_FILE", "")),
+		TLSCertClientFile: strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_CERT_CLIENT_FILE", "")),
+		UnixSocketPath:    strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_SERVER_UNIX_SOCKET_PATH", "")),
 	}
 
 	var err error
-	if listener.PreforkRecoverInterval, err = durationEnv("GOREST_SERVER_PREFORK_RECOVER_INTERVAL"); err != nil {
+	if listener.PreforkRecoverInterval, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_SERVER_PREFORK_RECOVER_INTERVAL",
+		listener.PreforkRecoverInterval,
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.ShutdownTimeout, err = durationEnv("GOREST_SERVER_SHUTDOWN_TIMEOUT"); err != nil {
+	if listener.ShutdownTimeout, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_SERVER_SHUTDOWN_TIMEOUT",
+		listener.ShutdownTimeout,
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.PreforkShutdownGracePeriod, err = durationEnv("GOREST_SERVER_PREFORK_SHUTDOWN_GRACE_PERIOD"); err != nil {
+	if listener.PreforkShutdownGracePeriod, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_SERVER_PREFORK_SHUTDOWN_GRACE_PERIOD",
+		listener.PreforkShutdownGracePeriod,
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.PreforkRecoverThreshold, err = nonNegativeIntEnv("GOREST_SERVER_PREFORK_RECOVER_THRESHOLD"); err != nil {
+	if listener.PreforkRecoverThreshold, err = goresthelper.ReadEnvironmentNonNegativeInteger(
+		"GOREST_SERVER_PREFORK_RECOVER_THRESHOLD",
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.UnixSocketFileMode, err = unixSocketFileModeEnv("GOREST_SERVER_UNIX_SOCKET_FILE_MODE"); err != nil {
+	if listener.UnixSocketFileMode, err = goresthelper.ReadEnvironmentFileMode(
+		"GOREST_SERVER_UNIX_SOCKET_FILE_MODE",
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.TLSMinVersion, err = tlsMinVersionEnv("GOREST_SERVER_TLS_MIN_VERSION"); err != nil {
+	if listener.TLSMinVersion, err = goresthelper.ReadEnvironmentTLSMinimumVersion(
+		"GOREST_SERVER_TLS_MIN_VERSION",
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.EnablePrefork, err = listenerBoolEnv("GOREST_SERVER_ENABLE_PREFORK"); err != nil {
+	if listener.EnablePrefork, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_SERVER_ENABLE_PREFORK",
+		listener.EnablePrefork,
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
-	if listener.EnablePrintRoutes, err = listenerBoolEnv("GOREST_SERVER_ENABLE_PRINT_ROUTES"); err != nil {
+	if listener.EnablePrintRoutes, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_SERVER_ENABLE_PRINT_ROUTES",
+		listener.EnablePrintRoutes,
+	); err != nil {
 		return server.ListenerConfig{}, err
 	}
 
 	return listener, nil
-}
-
-func listenerBoolEnv(key string) (bool, error) {
-	if envString(key, "") == "" {
-		return false, nil
-	}
-
-	return envBool(key, false)
-}
-
-func durationEnv(key string) (time.Duration, error) {
-	value := envString(key, "")
-	if value == "" {
-		return 0, nil
-	}
-
-	duration, err := time.ParseDuration(value)
-	if err != nil {
-		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
-	}
-	if duration < 0 {
-		return 0, fmt.Errorf("%s cannot be negative", key)
-	}
-
-	return duration, nil
-}
-
-func nonNegativeIntEnv(key string) (int, error) {
-	value := envString(key, "")
-	if value == "" {
-		return 0, nil
-	}
-
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("%s must be a non-negative integer", key)
-	}
-
-	return parsed, nil
-}
-
-func unixSocketFileModeEnv(key string) (os.FileMode, error) {
-	value := envString(key, "")
-	if value == "" {
-		return 0, nil
-	}
-
-	mode, err := strconv.ParseUint(value, 8, 32)
-	if err != nil || mode > 0o777 {
-		return 0, fmt.Errorf("%s must be an octal permission mode between 0000 and 0777", key)
-	}
-
-	return os.FileMode(mode), nil
-}
-
-func tlsMinVersionEnv(key string) (uint16, error) {
-	switch strings.ToLower(envString(key, "")) {
-	case "":
-		return 0, nil
-	case "1.2", "tls1.2":
-		return tls.VersionTLS12, nil
-	case "1.3", "tls1.3":
-		return tls.VersionTLS13, nil
-	default:
-		return 0, fmt.Errorf("%s must be 1.2 or 1.3", key)
-	}
-}
-
-func csvEnv(key string) []string {
-	value := strings.TrimSpace(os.Getenv(key))
-
-	if value == "" {
-		return []string{}
-	}
-
-	items := strings.Split(value, ",")
-
-	result := make([]string, 0, len(items))
-
-	for _, item := range items {
-		if trimmed := strings.TrimSpace(item); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-
-	return result
 }

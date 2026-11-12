@@ -10,6 +10,7 @@ import (
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest/database"
+	goresthelper "github.com/elsyahtech/gorest/helper"
 )
 
 // Database returns GOREST's SQLite defaults with this starter's migrations and
@@ -89,14 +90,14 @@ func LoadDatabase() (database.Config, error) {
 	}
 
 	cfg := Database()
-	production := Environment() == gorest.Production
+	production := runtimeEnvironment() == gorest.Production
 
 	if production {
 		cfg.Migration = false
 		cfg.Seeder = false
 	}
 
-	cfg.Driver = strings.ToLower(envString("GOREST_DB_DRIVER", cfg.Driver))
+	cfg.Driver = strings.ToLower(strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_DRIVER", cfg.Driver)))
 
 	switch cfg.Driver {
 	case database.MYSQL, database.POSTGRES, database.SQLSERVER, database.ORACLE,
@@ -110,8 +111,12 @@ func LoadDatabase() (database.Config, error) {
 		cfg.MaxIdleConnections = database.ConfigDefault.MaxIdleConnections
 	}
 
-	cfg.Host = envString("GOREST_DB_HOST", cfg.Host)
-	cfg.Port = envString("GOREST_DB_PORT", cfg.Port)
+	if value := goresthelper.ReadEnvironmentStringPointer("GOREST_DB_HOST"); value != nil {
+		cfg.Host = strings.TrimSpace(*value)
+	}
+	if value := goresthelper.ReadEnvironmentStringPointer("GOREST_DB_PORT"); value != nil {
+		cfg.Port = strings.TrimSpace(*value)
+	}
 
 	if cfg.Port != "" {
 		port, err := strconv.Atoi(cfg.Port)
@@ -123,24 +128,24 @@ func LoadDatabase() (database.Config, error) {
 
 	var err error
 
-	cfg.Name = envString("GOREST_DB_NAME", cfg.Name)
-	cfg.Username = envString("GOREST_DB_USERNAME", cfg.Username)
-	cfg.Password = envSecret("GOREST_DB_PASSWORD", cfg.Password)
-	cfg.TLS = envString("GOREST_DB_TLS", cfg.TLS)
-	if cfg.AllowInsecureProduction, err = envBool("GOREST_DB_ALLOW_INSECURE_PRODUCTION", cfg.AllowInsecureProduction); err != nil {
+	cfg.Name = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_NAME", cfg.Name))
+	cfg.Username = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_USERNAME", cfg.Username))
+	cfg.Password = goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_PASSWORD", cfg.Password)
+	cfg.TLS = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_TLS", cfg.TLS))
+	if cfg.AllowInsecureProduction, err = goresthelper.ReadEnvironmentBooleanWithDefault("GOREST_DB_ALLOW_INSECURE_PRODUCTION", cfg.AllowInsecureProduction); err != nil {
 		return database.Config{}, err
 	}
-	cfg.LibDir = envString("GOREST_DB_LIB_DIR", cfg.LibDir)
-	cfg.SSLCAPath = envString("GOREST_DB_SSL_CA_PATH", cfg.SSLCAPath)
-	cfg.SSLCertPath = envString("GOREST_DB_SSL_CERT_PATH", cfg.SSLCertPath)
-	cfg.SSLKeyPath = envString("GOREST_DB_SSL_KEY_PATH", cfg.SSLKeyPath)
-	cfg.DatabaseDirectory = envString("GOREST_DB_DIRECTORY", cfg.DatabaseDirectory)
+	cfg.LibDir = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_LIB_DIR", cfg.LibDir))
+	cfg.SSLCAPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_SSL_CA_PATH", cfg.SSLCAPath))
+	cfg.SSLCertPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_SSL_CERT_PATH", cfg.SSLCertPath))
+	cfg.SSLKeyPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_SSL_KEY_PATH", cfg.SSLKeyPath))
+	cfg.DatabaseDirectory = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_DB_DIRECTORY", cfg.DatabaseDirectory))
 
-	if cfg.Migration, err = envBool("GOREST_DB_MIGRATION", cfg.Migration); err != nil {
+	if cfg.Migration, err = goresthelper.ReadEnvironmentBooleanWithDefault("GOREST_DB_MIGRATION", cfg.Migration); err != nil {
 		return database.Config{}, err
 	}
 
-	if cfg.Seeder, err = envBool("GOREST_DB_SEEDER", cfg.Seeder); err != nil {
+	if cfg.Seeder, err = goresthelper.ReadEnvironmentBooleanWithDefault("GOREST_DB_SEEDER", cfg.Seeder); err != nil {
 		return database.Config{}, err
 	}
 

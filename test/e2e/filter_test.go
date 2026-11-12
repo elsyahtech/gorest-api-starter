@@ -19,7 +19,7 @@ func TestAuthenticationFilterRequiresAndAcceptsAccessToken(t *testing.T) {
 	filterConfig := filter.ConfigDefault
 	filterConfig.SignatureKey = &signatureKey
 	filterConfig.Issuer = "filter-integration-test"
-	filterConfig.CookieSecure = false
+	filterConfig.CookieConfig.CookieSecure = false
 	filterConfig.LoggerConfig.DisableLogging = true
 
 	app := gorest.New(gorest.Config{AppName: "filter-integration-test"})
@@ -35,7 +35,7 @@ func TestAuthenticationFilterRequiresAndAcceptsAccessToken(t *testing.T) {
 		t.Fatalf("create HTTP test server: %v", err)
 	}
 	httpServer.Post("/token", func(ctx *gorest.Context) error {
-		message, status, err := app.Filter().CreateToken(*ctx, "integration-test-user")
+		_, message, status, err := app.Filter().CreateToken(*ctx, "integration-test-user")
 		if err != nil {
 			return ctx.Status(status).SendString(message)
 		}

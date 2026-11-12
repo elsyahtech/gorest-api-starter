@@ -79,6 +79,7 @@ The E2E inventory is cross-checked against routes registered in `app/router/`:
 
 - **Departments and orders:** CRUD flows, partial updates, single-resource reads, order lookup by user, plus the registered `HEAD` and `OPTIONS` metadata routes.
 - **Authentication:** successful login, rejection of an incorrect password, access-cookie issuance, unauthenticated rejection of a protected route, and access to that route with the issued cookie. This scenario uses the selected E2E database driver, including MySQL.
+- **Hardening report:** a subprocess starts the configured GOREST HTTP server to verify the endpoint is disabled by default, denies peers outside the allowlist even when forwarded headers claim an allowed IP, serves JSON and HTML without caching, rejects unsupported formats, and does not expose the configured token-signing secret. These tests use loopback only and do not require a database or external service.
 - **User ORM queries:** list/detail, selected/all columns, ordering, grouping, distinct, `HAVING`, joins, preload, limit, and offset pagination.
 - **User writes:** create variants, upsert, returning results, single and bulk updates, PATCH status, and delete variants. Bulk-update tests include missing and duplicate primary-key validation.
 - **Native SQL:** user read/create/update/delete routes run against all five SQL drivers through the seven-driver runner; the ordinary `make test` suite exercises SQLite.
@@ -210,7 +211,7 @@ The direct test command does not start or stop containers. It runs migrations an
 
 ### MySQL TLS configuration in integration tests
 
-For MySQL, set `GOREST_DRIVER_TLS=true` to use system trust roots and verify the configured host name. For a private CA or mTLS, additionally set `GOREST_DRIVER_SSL_CA_PATH`, and for mTLS set both `GOREST_DRIVER_SSL_CERT_PATH` and `GOREST_DRIVER_SSL_KEY_PATH`. GOREST v1.1.20 loads these paths directly; the client certificate and key must match, and the MySQL account/server must require client-certificate authentication for the test to verify mTLS. The host configured in `GOREST_DRIVER_HOST` is used for server-name verification. For custom TLS settings or a different server name, a named `go-sql-driver/mysql` TLS profile can still be registered with `GOREST_DRIVER_TLS`; the test helper supports that profile mode and optional `GOREST_DRIVER_TLS_SERVER_NAME`. Do not use `InsecureSkipVerify`.
+For MySQL, set `GOREST_DRIVER_TLS=true` to use system trust roots and verify the configured host name. For a private CA or mTLS, additionally set `GOREST_DRIVER_SSL_CA_PATH`, and for mTLS set both `GOREST_DRIVER_SSL_CERT_PATH` and `GOREST_DRIVER_SSL_KEY_PATH`. The pinned GOREST v1.1.21 loads these paths directly; the client certificate and key must match, and the MySQL account/server must require client-certificate authentication for the test to verify mTLS. The host configured in `GOREST_DRIVER_HOST` is used for server-name verification. For custom TLS settings or a different server name, a named `go-sql-driver/mysql` TLS profile can still be registered with `GOREST_DRIVER_TLS`; the test helper supports that profile mode and optional `GOREST_DRIVER_TLS_SERVER_NAME`. Do not use `InsecureSkipVerify`.
 
 ### Non-TLS connections in local database tests
 

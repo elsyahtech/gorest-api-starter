@@ -74,6 +74,19 @@ export GOREST_HTTP_METRICS_ALLOWED_IPS=127.0.0.1/32,::1/128
 
 Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration completely. Set `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS=true` only when route-level breakdowns from `/gorest/http` are needed; it adds per-request processing and memory use. `/gorest/storage` is an estimate of database storage, not free filesystem capacity or maximum disk size. For filesystem capacity, use operating-system or infrastructure monitoring. See the [GOREST configuration guide](https://github.com/elsyahtech/gorest/blob/main/docs/configuration.md#operational-endpoints-and-environment-configuration).
 
+### Hardening report
+
+The starter exposes GOREST v1.1.21's optional runtime hardening report as an opt-in feature. It is separate from the monitoring endpoints and remains disabled unless explicitly enabled:
+
+```sh
+export GOREST_HARDENING_ENABLE=true
+export GOREST_HARDENING_ALLOWED_IPS=127.0.0.1/32,::1/128
+```
+
+Request the JSON report with `GET /gorest/hardening` or HTML with `GET /gorest/hardening?format=html`. The peer allowlist is required for access: if it is empty, every request receives `403 Forbidden`. The endpoint uses the TCP connection's peer IP, not `X-Forwarded-For` or other forwarded headers. When a reverse proxy is used, configure the proxy's trusted peer IP and restrict direct access to the application origin. Do not allow public caller ranges.
+
+The report inventories effective runtime configuration and provides advisory checks. The framework redacts passwords, signing keys, private keys, and token values, but the report can still reveal hosts, paths, usernames, and other metadata. Treat it as sensitive, keep it off public networks, and do not interpret it as a source-code scan or security certification. `GOREST_DISABLE_MONITORING_ENDPOINTS=true` does not disable this route; use `GOREST_HARDENING_ENABLE=false` (or unset it) to disable hardening reporting.
+
 ## Database and Redis
 
 - SQLite is the local default through `database.ConfigDefault`. The starter points it to `./app/database` and enables migrations and sample seeders for local examples. No external service or database credentials are needed initially.
@@ -86,6 +99,10 @@ Set `GOREST_DISABLE_MONITORING_ENDPOINTS=true` to disable route registration com
 The starter demonstrates token authentication on `GET /examples/orm-queries/users/with-authentication`; `POST /examples/login` issues its `access` cookie. Other `/examples` routes are not protected, and this example does not implement authorization.
 
 `GOREST_FILTER_SIGNATURE_KEY` configures the key used to sign authentication tokens. If it is unset, the current starter configuration falls back to the literal `your-signature-key`. That value is a development placeholder, not a secret; the application does not reject it automatically. Set a unique, high-entropy value through a protected environment or secret manager before using authentication in any deployed environment. Do not commit the value to source control.
+
+The starter pins GOREST v1.1.21. Its cookie options are configured through `filter.Config.CookieConfig`, and `app/config/filter.go` uses that nested configuration. The starter currently sets `SameSite=Lax`, path `/`, `Secure=true`, `HttpOnly=true`, and persistent cookies. Because the `Secure` flag is enabled, browsers send the authentication cookie over HTTPS only; local HTTP-based E2E tests explicitly disable this flag in their test configuration. The starter sets access-token lifetime to 15 minutes and refresh-token lifetime to 7 days.
+
+The optional GOREST hardening report is disabled by default. Configure `GOREST_HARDENING_ENABLE=true` to register `GET /gorest/hardening`, and set `GOREST_HARDENING_ALLOWED_IPS` to a comma-separated list of trusted peer IP addresses or CIDRs. An empty allowlist denies every request. The endpoint checks the TCP peer address and ignores forwarded headers; behind a reverse proxy, allow only the proxy's trusted address and restrict access at the proxy/network layer. The report is advisory, may disclose configuration metadata, and is not a security certification. See [Hardening report](#hardening-report).
 
 ### Secure database connections and `AllowInsecureProduction`
 
@@ -141,6 +158,8 @@ The logger writes to `./logs/app.log` and has rotation settings in `app/config/l
 | `GOREST_HTTP_METRICS_ALLOWED_IPS` | Comma-separated IP addresses/CIDRs allowed to access built-in `/gorest` endpoints; an explicitly empty value denies all | `127.0.0.1,::1` |
 | `GOREST_DISABLE_MONITORING_ENDPOINTS` | Disable registration of built-in monitoring endpoints | `false` (routes are registered; loopback callers are allowed) |
 | `GOREST_ENABLE_PER_ROUTE_HTTP_METRICS` | Include route-level breakdown in `/gorest/http` metrics | `false` |
+| `GOREST_HARDENING_ENABLE` | Register the optional `/gorest/hardening` configuration report | `false` (disabled) |
+| `GOREST_HARDENING_ALLOWED_IPS` | Comma-separated peer IP addresses/CIDRs allowed to access the hardening report; empty denies all | Empty (all requests denied when enabled) |
 | `GOREST_DB_DRIVER`, `GOREST_DB_HOST`, `GOREST_DB_PORT`, `GOREST_DB_NAME` | Database selection and endpoint | SQLite, GOREST defaults |
 | `GOREST_DB_USERNAME`, `GOREST_DB_PASSWORD` | Database credentials | Empty |
 | `GOREST_DB_TLS` | Optional driver-specific TLS mode; required explicitly by this starter for production MySQL, PostgreSQL, Oracle, SQL Server, and MongoDB (the mode may disable TLS) | GOREST default; ScyllaDB does not use this setting; SQLite has no network TLS |

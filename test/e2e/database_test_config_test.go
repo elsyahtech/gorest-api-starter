@@ -24,7 +24,7 @@ func e2eFilterConfig() filter.Config {
 	signatureKey := "gorest-api-starter-e2e-signature-key"
 	config := filter.ConfigDefault
 	config.SignatureKey = &signatureKey
-	config.CookieSecure = false
+	config.CookieConfig.CookieSecure = false
 	config.LoggerConfig.DisableLogging = true
 	return config
 }

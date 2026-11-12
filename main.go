@@ -10,6 +10,8 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
 	"github.com/elsyahtech/gorest/filter"
+	"github.com/elsyahtech/gorest/hardening"
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/monitoring"
 	"github.com/elsyahtech/gorest/redis"
@@ -17,6 +19,13 @@ import (
 )
 
 func main() {
+	environment := strings.ToLower(strings.TrimSpace(
+		goresthelper.ReadEnvironmentStringWithDefault("APP_ENV", gorest.Development),
+	))
+	if environment == "" {
+		environment = gorest.Development
+	}
+
 	databaseConfig, err := config.LoadDatabase()
 	if err != nil {
 		failConfiguration(err)
@@ -37,12 +46,17 @@ func main() {
 		failConfiguration(err)
 	}
 
+	hardeningConfig, err := config.LoadHardening()
+	if err != nil {
+		failConfiguration(err)
+	}
+
 	monitoringConfig, err := config.LoadMonitoring()
 	if err != nil {
 		failConfiguration(err)
 	}
 
-	if config.Environment() == gorest.Production {
+	if environment == gorest.Production {
 		if err := requireProductionRedis(redisConfig); err != nil {
 			failConfiguration(err)
 		}
@@ -52,7 +66,7 @@ func main() {
 	app := gorest.New(gorest.Config{
 		AppName:         "gorest-api-starter",
 		Version:         "1.0.0",
-		Environment:     config.Environment(),
+		Environment:     environment,
 		Timezone:        "Asia/Jakarta",
 		Debug:           false,
 		CheckForUpdates: gorest.EnableAutoUpdate,
@@ -66,6 +80,7 @@ func main() {
 		filter.Run(filterConfig),
 		server.Run(serverConfig),
 		monitoring.Run(monitoringConfig),
+		hardening.Run(hardeningConfig),
 	)
 	if databaseConfig.Driver == database.SQLITE {
 		if err := config.EnableSQLiteForeignKeys(app); err != nil {

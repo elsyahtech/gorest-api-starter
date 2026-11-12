@@ -42,7 +42,7 @@ func (lib *UserLibrary) Login(ctx *gorest.Context, req *entity.User) (string, in
 	tokenID := uuid.New().String() // Generate a unique token ID for the user.
 
 	// Generate token authentication and store it in cookies.
-	message, httpCode, err = lib.App.Filter().CreateToken(*ctx, tokenID)
+	_, message, httpCode, err = lib.App.Filter().CreateToken(*ctx, tokenID)
 	if err != nil {
 		return message, httpCode, fmt.Errorf("create token: %w", err)
 	}

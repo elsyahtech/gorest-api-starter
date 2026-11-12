@@ -1,6 +1,7 @@
 package config
 
 import (
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/monitoring"
 )
 
@@ -17,18 +18,23 @@ func Monitoring() monitoring.Config {
 func LoadMonitoring() (monitoring.Config, error) {
 	cfg := Monitoring()
 
+	cfg.MonitoringAllowedIPs = goresthelper.ReadEnvironmentStringSliceWithDefault(
+		"GOREST_HTTP_METRICS_ALLOWED_IPS",
+		cfg.MonitoringAllowedIPs,
+	)
+
 	var err error
-
-	cfg.MonitoringAllowedIPs, err = envStringSlice("GOREST_HTTP_METRICS_ALLOWED_IPS", cfg.MonitoringAllowedIPs)
-	if err != nil {
+	if cfg.DisableMonitoringEndpoints, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_DISABLE_MONITORING_ENDPOINTS",
+		cfg.DisableMonitoringEndpoints,
+	); err != nil {
 		return monitoring.Config{}, err
 	}
 
-	if cfg.DisableMonitoringEndpoints, err = envBool("GOREST_DISABLE_MONITORING_ENDPOINTS", cfg.DisableMonitoringEndpoints); err != nil {
-		return monitoring.Config{}, err
-	}
-
-	if cfg.EnableHTTPMetricsMonitoring, err = envBool("GOREST_ENABLE_PER_ROUTE_HTTP_METRICS", cfg.EnableHTTPMetricsMonitoring); err != nil {
+	if cfg.EnableHTTPMetricsMonitoring, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_ENABLE_PER_ROUTE_HTTP_METRICS",
+		cfg.EnableHTTPMetricsMonitoring,
+	); err != nil {
 		return monitoring.Config{}, err
 	}
 

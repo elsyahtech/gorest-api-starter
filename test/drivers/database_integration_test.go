@@ -460,7 +460,7 @@ func driverIntegrationFilterConfig() filter.Config {
 	signatureKey := "gorest-api-starter-driver-integration-test-key"
 	config := filter.ConfigDefault
 	config.SignatureKey = &signatureKey
-	config.CookieSecure = false
+	config.CookieConfig.CookieSecure = false
 	config.LoggerConfig.DisableLogging = true
 	return config
 }

@@ -34,7 +34,7 @@ export GOREST_DB_PORT=3306
 export GOREST_DB_TLS=disable
 ```
 
-For TLS, set `GOREST_DB_TLS=true`. GOREST v1.1.20 uses the system root certificates and verifies the server hostname against `GOREST_DB_HOST` when no CA path is set. A CA path is not needed when the server certificate chains to a trusted system root.
+For TLS, set `GOREST_DB_TLS=true`. The pinned GOREST v1.1.21 uses the system root certificates and verifies the server hostname against `GOREST_DB_HOST` when no CA path is set. A CA path is not needed when the server certificate chains to a trusted system root.
 
 For a private server CA, set `GOREST_DB_SSL_CA_PATH` to its PEM certificate file. For mTLS, also set both `GOREST_DB_SSL_CERT_PATH` and `GOREST_DB_SSL_KEY_PATH` to the client certificate and matching private key; the MySQL server must trust the client certificate and require client authentication. These paths are used directly with `GOREST_DB_TLS=true`, so the application does not need to register a MySQL TLS profile. A named profile registered with `mysql.RegisterTLSConfig` takes precedence over the path settings. Keep the private key readable only by the application account, and do not use `skip-verify` or `preferred` where server identity verification is required.
 

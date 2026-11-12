@@ -3,10 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/redis"
 )
 
@@ -26,12 +26,12 @@ func LoadRedis() (redis.Config, error) {
 		return redis.Config{}, err
 	}
 
-	disable, err := envBool("GOREST_REDIS_DISABLE", true)
+	disable, err := goresthelper.ReadEnvironmentBooleanWithDefault("GOREST_REDIS_DISABLE", true)
 	if err != nil {
 		return redis.Config{}, err
 	}
 
-	tls, err := envBool("GOREST_REDIS_TLS", false)
+	tls, err := goresthelper.ReadEnvironmentBooleanWithDefault("GOREST_REDIS_TLS", false)
 	if err != nil {
 		return redis.Config{}, err
 	}
@@ -39,18 +39,22 @@ func LoadRedis() (redis.Config, error) {
 	databaseNumber := 0
 
 	if value, ok := os.LookupEnv("GOREST_REDIS_DATABASE"); ok {
-		databaseNumber, err = strconv.Atoi(strings.TrimSpace(value))
-
-		if err != nil || databaseNumber < 0 {
+		if strings.TrimSpace(value) == "" {
+			return redis.Config{}, fmt.Errorf("GOREST_REDIS_DATABASE must be a non-negative integer")
+		}
+		databaseNumber, err = goresthelper.ReadEnvironmentNonNegativeInteger("GOREST_REDIS_DATABASE")
+		if err != nil {
 			return redis.Config{}, fmt.Errorf("GOREST_REDIS_DATABASE must be a non-negative integer")
 		}
 	}
 
-	redisPort := envString("GOREST_REDIS_PORT", "6379")
+	redisPort := strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_PORT", "6379"))
 
 	if value, ok := os.LookupEnv("GOREST_REDIS_PORT"); ok {
-		port, parseErr := strconv.Atoi(strings.TrimSpace(value))
-
+		if strings.TrimSpace(value) == "" {
+			return redis.Config{}, fmt.Errorf("GOREST_REDIS_PORT must be an integer between 1 and 65535")
+		}
+		port, parseErr := goresthelper.ReadEnvironmentIntegerWithDefault("GOREST_REDIS_PORT", 6379)
 		if parseErr != nil || port < 1 || port > 65535 {
 			return redis.Config{}, fmt.Errorf("GOREST_REDIS_PORT must be an integer between 1 and 65535")
 		}
@@ -64,18 +68,18 @@ func LoadRedis() (redis.Config, error) {
 
 		// For local development. In containers, use the Redis service name or
 		// reachable private host instead of 127.0.0.1.
-		Host: envString("GOREST_REDIS_HOST", "127.0.0.1"),
+		Host: strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_HOST", "127.0.0.1")),
 		Port: redisPort,
 
 		// Supply credentials when Redis authentication is enabled. Avoid
 		// committing production credentials to source control.
-		Username: envString("GOREST_REDIS_USERNAME", ""),
-		Password: envSecret("GOREST_REDIS_PASSWORD", ""),
+		Username: strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_USERNAME", "")),
+		Password: goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_PASSWORD", ""),
 
 		// Set certificate paths when TLS or mutual TLS is configured.
-		SSLCAPath:   envString("GOREST_REDIS_SSL_CA_PATH", ""),
-		SSLCertPath: envString("GOREST_REDIS_SSL_CERT_PATH", ""),
-		SSLKeyPath:  envString("GOREST_REDIS_SSL_KEY_PATH", ""),
+		SSLCAPath:   strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_SSL_CA_PATH", "")),
+		SSLCertPath: strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_SSL_CERT_PATH", "")),
+		SSLKeyPath:  strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault("GOREST_REDIS_SSL_KEY_PATH", "")),
 
 		// Connection and pool timeouts.
 		Timeout:         5 * time.Second,
