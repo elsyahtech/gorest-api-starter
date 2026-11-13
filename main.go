@@ -11,6 +11,7 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/router"
 	"github.com/elsyahtech/gorest/database"
 	"github.com/elsyahtech/gorest/filter"
+	"github.com/elsyahtech/gorest/hardening"
 	"github.com/elsyahtech/gorest/log"
 	"github.com/elsyahtech/gorest/monitoring"
 	"github.com/elsyahtech/gorest/redis"
@@ -61,6 +62,11 @@ func main() {
 		failConfiguration(err)
 	}
 
+	hardeningConfig, err := config.HardeningConfig()
+	if err != nil {
+		failConfiguration(err)
+	}
+
 	// =====================================================================
 	// 2. Initialize application
 	// =====================================================================
@@ -76,6 +82,7 @@ func main() {
 		redis.Run(*redisConfig),
 		filter.Run(*filterConfig),
 		monitoring.Run(*monitoringConfig),
+		hardening.Run(*hardeningConfig),
 	)
 
 	// =====================================================================

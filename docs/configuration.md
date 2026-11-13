@@ -4,13 +4,13 @@ The active runtime configuration is defined in `app/config/`. The executable loa
 
 ## Application and HTTP server
 
-The sample uses GOREST v1.1.20. Application settings use `GOREST_APP_*`; the HTTP listener and middleware use the `GOREST_SERVER_*` variables in `.env.example`. The default local bind is `127.0.0.1:3000`. Set the bind address intentionally when deploying behind a proxy or container network.
+The sample uses GOREST v1.1.21. Application settings use `GOREST_APP_*`; the HTTP listener and middleware use the `GOREST_SERVER_*` variables in `.env.example`. The default local bind is `127.0.0.1:3000`. Set the bind address intentionally when deploying behind a proxy or container network.
 
-Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.20 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.20/docs/configuration.md).
+Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md).
 
 ## MySQL
 
-MySQL connection variables are documented in the [MySQL configuration guide](./database.md). GOREST v1.1.20 supports verified server TLS, custom CA files, and client certificates for mTLS through the database configuration. Follow the guide to set the required CA and client key pair.
+MySQL connection variables are documented in the [MySQL configuration guide](./database.md). GOREST v1.1.21 supports verified server TLS, custom CA files, and client certificates for mTLS through the database configuration. Follow the guide to set the required CA and client key pair.
 
 ## Redis (optional)
 
@@ -39,13 +39,28 @@ GOREST_REDIS_CERT_PATH=/run/secrets/redis-client.pem
 GOREST_REDIS_KEY_PATH=/run/secrets/redis-client-key.pem
 ```
 
-Mount certificate files as secrets with read access limited to the application account. Do not commit credentials, private keys, or certificates. The starter passes these settings to GOREST using `redis.Run(redisConfig)`. See the [GOREST v1.1.20 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.20/docs/configuration.md) for pool, timeout, retry, and TLS options. See [Testing and coverage](./testing.md) for optional connectivity checks.
+Mount certificate files as secrets with read access limited to the application account. Do not commit credentials, private keys, or certificates. The starter passes these settings to GOREST using `redis.Run(redisConfig)`. See the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md) for pool, timeout, retry, and TLS options. See [Testing and coverage](./testing.md) for optional connectivity checks.
 
 ## Authentication and sample limits
 
 Replace the example `GOREST_FILTER_SIGNATURE_KEY` with a unique, high-entropy secret. Review cookie security settings and use HTTPS in deployments where credentials or cookies cross an untrusted network.
 
+GOREST v1.1.21 groups cookie options under `filter.Config.CookieConfig`; the starter's existing `GOREST_FILTER_COOKIE_*` variables continue to configure those fields. Cookie expiry is derived from access- and refresh-token durations. `GOREST_FILTER_COOKIE_MAX_AGE` is no longer used by the starter; configure `GOREST_FILTER_ACCESS_TOKEN_DURATION` and `GOREST_FILTER_REFRESH_TOKEN_DURATION` instead.
+
 The create and login endpoints are public examples. Only `GET /users/` uses authentication; the example does not implement authorization roles or protect business resources. Add application-specific access control before exposing it.
+
+The optional GOREST hardening report is disabled by default. Set `GOREST_HARDENING_ENABLE=true` and configure `GOREST_HARDENING_ALLOWED_IPS` with trusted peer IP addresses or CIDRs to expose `GET /gorest/hardening`. An empty allowlist denies all callers. GOREST checks the TCP peer IP and does not trust forwarded headers; behind a reverse proxy, allow only its trusted peer and restrict direct access to the application. The report is advisory, may disclose configuration metadata, and is not a security certification. See the [hardening report configuration](#hardening-report).
+
+### Hardening report
+
+```dotenv
+GOREST_HARDENING_ENABLE=true
+GOREST_HARDENING_ALLOWED_IPS=127.0.0.1/32,::1/128
+```
+
+The endpoint returns JSON by default; request HTML with `/gorest/hardening?format=html` or `Accept: text/html`. The endpoint is separate from monitoring and is not disabled by `GOREST_MONITORING_DISABLE`. Disable it by unsetting `GOREST_HARDENING_ENABLE` or setting it to `false`.
+
+The report inventories effective runtime configuration and performs advisory checks. Passwords, signing keys, private keys, and token values are redacted by GOREST, but hosts, file paths, usernames, and other metadata may remain visible. Restrict access, treat report contents as sensitive, and do not interpret a clean report as proof that the application or its infrastructure is secure.
 
 ## Monitoring and logs
 

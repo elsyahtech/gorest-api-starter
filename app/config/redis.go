@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/redis"
 )
 
@@ -13,60 +14,155 @@ func RedisConfig() (*redis.Config, error) {
 
 	var err error
 
-	cfg.Disable, err = envStrToBool("GOREST_REDIS_DISABLE", true)
+	cfg.Disable, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_REDIS_DISABLE",
+		true,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_DISABLE: %w", err)
 	}
 
-	cfg.Database = envStrToInt("GOREST_REDIS_DATABASE", redis.DefaultRedisDatabase)
-	cfg.Host = envStr("GOREST_REDIS_HOST", redis.DefaultRedisHost)
-	cfg.Port = envStr("GOREST_REDIS_PORT", redis.DefaultRedisPort)
-	cfg.Username = envStr("GOREST_REDIS_USER", "")
-	cfg.Password = envStr("GOREST_REDIS_PASSWORD", "")
+	cfg.Database, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_DATABASE",
+		redis.DefaultRedisDatabase,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_DATABASE: %w", err)
+	}
 
-	cfg.TLS, err = envStrToBool("GOREST_REDIS_TLS", false)
+	cfg.Host = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_HOST",
+		redis.DefaultRedisHost,
+	)
+
+	cfg.Port = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_PORT",
+		redis.DefaultRedisPort,
+	)
+
+	cfg.Username = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_USER",
+		"",
+	)
+
+	cfg.Password = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_PASSWORD",
+		"",
+	)
+
+	cfg.TLS, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_REDIS_TLS",
+		false,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_TLS: %w", err)
 	}
 
-	cfg.SSLCertPath = envStr("GOREST_REDIS_CERT_PATH", "")
-	cfg.SSLKeyPath = envStr("GOREST_REDIS_KEY_PATH", "")
+	cfg.SSLCertPath = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_CERT_PATH",
+		"",
+	)
+
+	cfg.SSLKeyPath = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_KEY_PATH",
+		"",
+	)
 	if (cfg.SSLCertPath == "") != (cfg.SSLKeyPath == "") {
 		return &redis.Config{}, errors.New("GOREST_REDIS_CERT_PATH and GOREST_REDIS_KEY_PATH must be configured together")
 	}
-	cfg.SSLCAPath = envStr("GOREST_REDIS_CA_PATH", "")
 
-	cfg.Timeout, err = envStrToTimeDuration("GOREST_REDIS_TIMEOUT", redis.DefaultRedisTimeout)
+	cfg.SSLCAPath = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_REDIS_CA_PATH",
+		"",
+	)
+
+	cfg.Timeout, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_REDIS_TIMEOUT",
+		redis.DefaultRedisTimeout,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_TIMEOUT: %w", err)
 	}
 
-	cfg.PoolTimeout, err = envStrToTimeDuration("GOREST_REDIS_POOL_TIMEOUT", redis.DefaultRedisPoolTimeout)
+	cfg.PoolTimeout, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_REDIS_POOL_TIMEOUT",
+		redis.DefaultRedisPoolTimeout,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_POOL_TIMEOUT: %w", err)
 	}
 
-	cfg.ConnMaxLifetime, err = envStrToTimeDuration("GOREST_REDIS_CONN_MAX_LIFETIME", redis.DefaultRedisConnMaxLifetime)
+	cfg.ConnMaxLifetime, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_REDIS_CONN_MAX_LIFETIME",
+		redis.DefaultRedisConnMaxLifetime,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_CONN_MAX_LIFETIME: %w", err)
 	}
 
-	cfg.ConnMaxIdleTime, err = envStrToTimeDuration("GOREST_REDIS_CONN_MAX_IDLE_TIME", redis.DefaultRedisConnMaxIdleTime)
+	cfg.ConnMaxIdleTime, err = goresthelper.ReadEnvironmentDurationWithDefault(
+		"GOREST_REDIS_CONN_MAX_IDLE_TIME",
+		redis.DefaultRedisConnMaxIdleTime,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_CONN_MAX_IDLE_TIME: %w", err)
 	}
 
-	cfg.AllowInsecureProduction, err = envStrToBool("GOREST_REDIS_ALLOW_INSECURE_PRODUCTION", false)
+	cfg.AllowInsecureProduction, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_REDIS_ALLOW_INSECURE_PRODUCTION",
+		false,
+	)
 	if err != nil {
 		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_ALLOW_INSECURE_PRODUCTION: %w", err)
 	}
 
-	cfg.MaxRetries = envStrToInt("GOREST_REDIS_MAX_RETRIES", redis.DefaultRedisMaxRetries)
-	cfg.PoolSize = envStrToInt("GOREST_REDIS_POOL_SIZE", redis.DefaultRedisPoolSize)
-	cfg.MinIdleConns = envStrToInt("GOREST_REDIS_MIN_IDLE_CONNS", redis.DefaultRedisMinIdleConns)
-	cfg.MaxActiveConns = envStrToInt("GOREST_REDIS_MAX_ACTIVE_CONNS", redis.DefaultRedisMaxActiveConns)
-	cfg.ReadBufferSize = envStrToInt("GOREST_REDIS_READ_BUFFER_SIZE", redis.DefaultRedisReadBufferSize)
-	cfg.WriteBufferSize = envStrToInt("GOREST_REDIS_WRITE_BUFFER_SIZE", redis.DefaultRedisWriteBufferSize)
+	cfg.MaxRetries, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_MAX_RETRIES",
+		redis.DefaultRedisMaxRetries,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_MAX_RETRIES: %w", err)
+	}
+
+	cfg.PoolSize, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_POOL_SIZE",
+		redis.DefaultRedisPoolSize,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_POOL_SIZE: %w", err)
+	}
+
+	cfg.MinIdleConns, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_MIN_IDLE_CONNS",
+		redis.DefaultRedisMinIdleConns,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_MIN_IDLE_CONNS: %w", err)
+	}
+
+	cfg.MaxActiveConns, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_MAX_ACTIVE_CONNS",
+		redis.DefaultRedisMaxActiveConns,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_MAX_ACTIVE_CONNS: %w", err)
+	}
+
+	cfg.ReadBufferSize, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_READ_BUFFER_SIZE",
+		redis.DefaultRedisReadBufferSize,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_READ_BUFFER_SIZE: %w", err)
+	}
+
+	cfg.WriteBufferSize, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_REDIS_WRITE_BUFFER_SIZE",
+		redis.DefaultRedisWriteBufferSize,
+	)
+	if err != nil {
+		return &redis.Config{}, fmt.Errorf("failed to parse GOREST_REDIS_WRITE_BUFFER_SIZE: %w", err)
+	}
 
 	return &cfg, nil
 }

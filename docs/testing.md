@@ -14,6 +14,7 @@ app/
   view/*_test.go            entity-to-response mapping tests
 integration-test/
   config.go                 test-only environment and database-safety checks
+  hardening_http_test.go    hardening endpoint HTTP integration test (no database)
   user_library_test.go      user library behavior against MySQL
   users_http_test.go        HTTP E2E flow against the running application
   mysql_mtls_test.go        optional MySQL client-certificate verification
@@ -24,6 +25,8 @@ scripts/
 ```
 
 The current code has no separate service package or application-owned middleware package requiring independent unit tests. GOREST's authentication filter is verified through the HTTP integration flow.
+
+The hardening-report integration test lives under `integration-test/` and starts a separate GOREST HTTP process without a database. Run it independently with `make test-hardening-integration`. It verifies that the route is disabled by default, denies non-allowlisted peers despite spoofed forwarded headers, serves redacted JSON/HTML reports with no-store headers, and rejects unsupported formats.
 
 ## Unit tests
 
@@ -81,7 +84,7 @@ To run the Redis integration test in CI, configure the optional `GOREST_TEST_RED
 
 To run the Redis mTLS check in CI, configure the optional `GOREST_TEST_REDIS_MTLS_HOST`, `DATABASE`, `CA_PEM`, `CLIENT_CERT_PEM`, and `CLIENT_KEY_PEM` secrets; `PORT` defaults to `6379`, and `USER` / `PASSWORD` are needed only when Redis authentication is enabled. This must be an endpoint configured to require client certificates. The workflow writes the CA and client key pair to restricted-permission temporary files. See [Redis TLS and mTLS configuration](./configuration.md#use-a-private-ca-or-mutual-tls) for client-side setup and certificate roles.
 
-Before enabling the job, provision a dedicated non-production database, verify that GitHub-hosted runners can reach it, and grant the test account permission to create the `users` table and migration metadata. The integration test applies the up migration automatically; it does not drop tables or seed data. Store credentials and the PEM CA contents as GitHub Actions secrets rather than workflow literals; see GitHub's [using secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) guide. GOREST v1.1.20 supports TLS with system roots or a configured CA and can present a configured client certificate for mTLS; see [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates).
+Before enabling the job, provision a dedicated non-production database, verify that GitHub-hosted runners can reach it, and grant the test account permission to create the `users` table and migration metadata. The integration test applies the up migration automatically; it does not drop tables or seed data. Store credentials and the PEM CA contents as GitHub Actions secrets rather than workflow literals; see GitHub's [using secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) guide. GOREST v1.1.21 supports TLS with system roots or a configured CA and can present a configured client certificate for mTLS; see [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates).
 
 If the required secrets are unavailable, GitHub skips the E2E job; it does not substitute a local or production database. A skipped job means E2E was not run and is not evidence that the HTTP flow passed. This commonly applies to pull requests from forks, for which GitHub does not expose repository secrets to the workflow. See GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request) documentation for the `pull_request` event's secret-access behavior. Configure repository Actions secrets for a dedicated non-production database according to your project's access policy; do not weaken the workflow's database safety checks to make secrets available.
 
@@ -104,7 +107,7 @@ The test uses a random user ID/email on each run so repeated and concurrent runs
 
 ## MySQL mutual-TLS integration test
 
-`TestMySQLMutualTLSRequiresClientCertificate` is an opt-in, read-only connection test using GOREST v1.1.20's native MySQL TLS paths. It is separate from the HTTP E2E test. To run it, configure all of the following in `.env` or the environment:
+`TestMySQLMutualTLSRequiresClientCertificate` is an opt-in, read-only connection test using GOREST v1.1.21's native MySQL TLS paths. It is separate from the HTTP E2E test. To run it, configure all of the following in `.env` or the environment:
 
 - `GOREST_TEST_MYSQL_MTLS_HOST`, optional `GOREST_TEST_MYSQL_MTLS_PORT` (defaults to `3306`), and `GOREST_TEST_MYSQL_MTLS_DATABASE`.
 - `GOREST_TEST_MYSQL_MTLS_USER` and `GOREST_TEST_MYSQL_MTLS_PASSWORD` for a dedicated MySQL account that has `REQUIRE X509`.
