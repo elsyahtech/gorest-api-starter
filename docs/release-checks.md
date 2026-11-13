@@ -18,4 +18,4 @@ For combined test output and application coverage, use `make integration-reports
 
 GitHub Actions runs the unit checks automatically. Its PostgreSQL integration job runs only when the required database and mTLS secrets are configured; without them, that job is skipped and no integration result is produced.
 
-The starter currently uses GOREST v1.1.20 and the Go version in `go.mod`. Before changing framework or Go versions, review the target version's documentation and compatibility notes, then rerun the applicable checks and PostgreSQL integration tests.
+The starter currently uses GOREST v1.1.21 and the Go version in `go.mod`. Before changing framework or Go versions, review the target version's documentation and compatibility notes, then rerun the applicable checks and PostgreSQL integration tests.

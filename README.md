@@ -38,6 +38,7 @@ The application loads `.env` when present and also supports environment-only sta
 make unit-test       # isolated unit tests; no database required
 make coverage        # unit coverage profile, text summary, and HTML report
 make test-integration # PostgreSQL TLS/mTLS and HTTP integration tests
+make test-hardening-integration # local hardening endpoint test; no database required
 make integration-reports # one integration run: readable and JSON reports plus app coverage
 ```
 

@@ -156,100 +156,14 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_FILTER_COOKIE_SAME_SITE",
 	"GOREST_FILTER_COOKIE_DOMAIN",
 	"GOREST_FILTER_COOKIE_PATH",
-	"GOREST_FILTER_COOKIE_MAX_AGE",
 	"GOREST_FILTER_COOKIE_SECURE",
 	"GOREST_FILTER_COOKIE_HTTP_ONLY",
 	"GOREST_FILTER_COOKIE_SESSION_ONLY",
+	"GOREST_HARDENING_ENABLE",
+	"GOREST_HARDENING_ALLOWED_IPS",
 	"GOREST_MONITORING_ALLOWED_IPS",
 	"GOREST_MONITORING_DISABLE",
 	"GOREST_MONITORING_ENABLE_HTTP_METRICS",
-}
-
-func TestStrLoadsEnvironmentValueAndUsesDefaultWhenEmpty(t *testing.T) {
-	t.Setenv("CONFIG_TEST_STRING", "  configured value  ")
-	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "configured value" {
-		t.Fatalf("str() = %q, want trimmed environment value", got)
-	}
-
-	t.Setenv("CONFIG_TEST_STRING", "  ")
-	if got := envStr("CONFIG_TEST_STRING", "fallback"); got != "fallback" {
-		t.Fatalf("str() with blank environment value = %q, want fallback", got)
-	}
-}
-
-func TestStrToIntLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
-	t.Setenv("CONFIG_TEST_INTEGER", " 42 ")
-	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 42 {
-		t.Fatalf("envStrToInt() = %d, want 42", got)
-	}
-
-	t.Setenv("CONFIG_TEST_INTEGER", "invalid")
-	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
-		t.Fatalf("envStrToInt() with invalid environment value = %d, want default 10", got)
-	}
-
-	t.Setenv("CONFIG_TEST_INTEGER", " ")
-	if got := envStrToInt("CONFIG_TEST_INTEGER", 10); got != 10 {
-		t.Fatalf("envStrToInt() with blank environment value = %d, want default 10", got)
-	}
-}
-
-func TestStrToTimeDurationLoadsEnvironmentValueAndUsesDefaultWhenInvalid(t *testing.T) {
-	t.Setenv("CONFIG_TEST_DURATION", " 2m ")
-	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != 2*time.Minute {
-		t.Fatalf("envStrToTimeDuration() = %s, want 2m", got)
-	}
-
-	t.Setenv("CONFIG_TEST_DURATION", "invalid")
-	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
-		t.Fatalf("envStrToTimeDuration() with invalid value = %s, want default 1s", got)
-	}
-
-	t.Setenv("CONFIG_TEST_DURATION", " ")
-	if got, _ := envStrToTimeDuration("CONFIG_TEST_DURATION", time.Second); got != time.Second {
-		t.Fatalf("envStrToTimeDuration() with blank value = %s, want default 1s", got)
-	}
-}
-
-func TestToStrArrayUsesEnvironmentValueAndDefaults(t *testing.T) {
-	const key = "CONFIG_TEST_STRING_ARRAY"
-	previous, wasSet := os.LookupEnv(key)
-	if err := os.Unsetenv(key); err != nil {
-		t.Fatalf("unset %s: %v", key, err)
-	}
-	t.Cleanup(func() {
-		var err error
-		if wasSet {
-			err = os.Setenv(key, previous)
-		} else {
-			err = os.Unsetenv(key)
-		}
-		if err != nil {
-			t.Errorf("restore %s: %v", key, err)
-		}
-	})
-
-	defaultValue := []string{"default"}
-	if got := envToStrArray(key, defaultValue); len(got) != 1 || got[0] != "default" {
-		t.Fatalf("envToStrArray() with unset variable = %v, want %v", got, defaultValue)
-	}
-
-	t.Setenv(key, " first, second ,, third ")
-	got := envToStrArray(key, defaultValue)
-	want := []string{"first", "second", "third"}
-	if len(got) != len(want) {
-		t.Fatalf("envToStrArray() = %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("envToStrArray() = %v, want %v", got, want)
-		}
-	}
-
-	t.Setenv(key, " ")
-	if got := envToStrArray(key, defaultValue); got == nil || len(got) != 0 {
-		t.Fatalf("envToStrArray() with explicitly empty variable = %v, want empty non-nil slice", got)
-	}
 }
 
 func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
@@ -279,13 +193,13 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 	if cfg.Issuer != "gorest" {
 		t.Errorf("FilterConfig().Issuer = %q, want gorest", cfg.Issuer)
 	}
-	if cfg.CookieSameSite != "Lax" || cfg.CookiePath != "/" || cfg.CookieDomain != "" {
+	if cfg.CookieConfig.CookieSameSite != "Lax" || cfg.CookieConfig.CookiePath != "/" || cfg.CookieConfig.CookieDomain != "" {
 		t.Errorf("LoadFilters() cookie scope = (%q, %q, %q), want (Lax, /, empty)",
-			cfg.CookieSameSite, cfg.CookiePath, cfg.CookieDomain)
+			cfg.CookieConfig.CookieSameSite, cfg.CookieConfig.CookiePath, cfg.CookieConfig.CookieDomain)
 	}
-	if cfg.CookieSecure || !cfg.CookieHTTPOnly || cfg.CookieSessionOnly {
+	if cfg.CookieConfig.CookieSecure || !cfg.CookieConfig.CookieHTTPOnly || cfg.CookieConfig.CookieSessionOnly {
 		t.Errorf("LoadFilters() cookie flags = (secure:%t, httpOnly:%t, sessionOnly:%t), want (true, true, false)",
-			cfg.CookieSecure, cfg.CookieHTTPOnly, cfg.CookieSessionOnly)
+			cfg.CookieConfig.CookieSecure, cfg.CookieConfig.CookieHTTPOnly, cfg.CookieConfig.CookieSessionOnly)
 	}
 	if cfg.LoggerConfig.DisableLogging ||
 		len(cfg.LoggerConfig.EnabledEvents) != 1 ||
@@ -409,19 +323,23 @@ func TestLoadRedisRequiresClientCertificateAndKeyTogether(t *testing.T) {
 	}
 }
 
-func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
+func TestAppConfigAcceptsOnlySupportedEnvironmentModes(t *testing.T) {
 	for _, mode := range []string{gorest.Development, gorest.Production, gorest.Testing} {
 		t.Run("accepts "+mode, func(t *testing.T) {
-			if err := validateEnvironment(mode); err != nil {
-				t.Fatalf("validateEnvironment() error = %v", err)
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_APP_ENV", mode)
+			if _, err := AppConfig(); err != nil {
+				t.Fatalf("AppConfig() error = %v", err)
 			}
 		})
 	}
 
 	for _, mode := range []string{"test", "staging"} {
 		t.Run("rejects "+mode, func(t *testing.T) {
-			if err := validateEnvironment(mode); err == nil {
-				t.Fatalf("validateEnvironment() accepted GOREST_APP_ENV=%q", mode)
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_APP_ENV", mode)
+			if _, err := AppConfig(); err == nil {
+				t.Fatalf("AppConfig() accepted GOREST_APP_ENV=%q", mode)
 			}
 		})
 	}
@@ -436,6 +354,57 @@ func TestValidateEnvironmentAcceptsOnlyGORESTModes(t *testing.T) {
 			t.Fatalf("AppConfig().Environment = %q, want %q", cfg.Environment, gorest.Development)
 		}
 	})
+}
+
+func TestConfigRejectsInvalidIntegerEnvironmentValues(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		configure func(*testing.T)
+		load      func() error
+	}{
+		{
+			name: "logger",
+			key:  "GOREST_LOG_MAX_FILE_SIZE",
+			load: func() error {
+				_, err := LoggerConfig()
+				return err
+			},
+		},
+		{
+			name: "database",
+			key:  "GOREST_DB_MAX_OPEN_CONNECTIONS",
+			configure: func(t *testing.T) {
+				t.Setenv("GOREST_DB_USER", "test-user")
+				t.Setenv("GOREST_DB_PASSWORD", "test-password")
+			},
+			load: func() error {
+				_, err := DatabaseConfig()
+				return err
+			},
+		},
+		{
+			name: "server",
+			key:  "GOREST_SERVER_PORT",
+			load: func() error {
+				_, err := ServerConfig()
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			isolateConfigurationEnvironment(t)
+			if test.configure != nil {
+				test.configure(t)
+			}
+			t.Setenv(test.key, "not-an-integer")
+			if err := test.load(); err == nil {
+				t.Fatalf("configuration accepted %s=%q", test.key, "not-an-integer")
+			}
+		})
+	}
 }
 
 func isolateConfigurationEnvironment(t *testing.T) {

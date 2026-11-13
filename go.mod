@@ -3,7 +3,7 @@ module github.com/elsyahtech/gorest-api-starter
 go 1.26.5
 
 require (
-	github.com/elsyahtech/gorest v1.1.20
+	github.com/elsyahtech/gorest v1.1.21
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1

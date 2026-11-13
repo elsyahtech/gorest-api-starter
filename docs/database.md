@@ -30,7 +30,7 @@ When the server certificate chains to a CA trusted by the host system, a custom 
 
 For mTLS, configure `GOREST_DB_TLS=verify-full`, the server-verifying CA in `GOREST_DB_CA_PATH`, and both `GOREST_DB_CERT_PATH` and `GOREST_DB_KEY_PATH` for the client certificate and matching private key. The PostgreSQL server must trust the client certificate issuer and be configured to require client-certificate authentication. The server-side `pg_hba.conf` policy and certificate trust configuration determine whether a client certificate is required; client-side settings alone do not enable server enforcement.
 
-Keep private keys readable only by the application account, and never disable certificate verification in production. See the [PostgreSQL TLS documentation](https://www.postgresql.org/docs/current/libpq-ssl.html), [GOREST v1.1.20 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.20/docs/configuration.md), and [testing guide](./testing.md) for client-side setup and integration-test safeguards.
+Keep private keys readable only by the application account, and never disable certificate verification in production. See the [PostgreSQL TLS documentation](https://www.postgresql.org/docs/current/libpq-ssl.html), [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md), and [testing guide](./testing.md) for client-side setup and integration-test safeguards.
 
 ## Integration-test database
 

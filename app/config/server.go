@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	goresthelper "github.com/elsyahtech/gorest/helper"
 	"github.com/elsyahtech/gorest/server"
 	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -15,10 +15,25 @@ import (
 func ServerConfig() (*server.Config, error) {
 	cfg := server.ConfigDefault
 
-	cfg.Host = envStr("GOREST_SERVER_HOST", server.DefaultServerHost)
-	cfg.Port = envStrToInt("GOREST_SERVER_PORT", server.DefaultServerPort)
+	var err error
 
-	stackTrace, err := envStrToBool("GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE", false)
+	cfg.Host = goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_SERVER_HOST",
+		server.DefaultServerHost,
+	)
+
+	cfg.Port, err = goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_SERVER_PORT",
+		server.DefaultServerPort,
+	)
+	if err != nil {
+		return &server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_PORT: %w", err)
+	}
+
+	stackTrace, err := goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE",
+		false,
+	)
 	if err != nil {
 		return &server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_RECOVER_ENABLE_STACK_TRACE: %w", err)
 	}
@@ -28,31 +43,26 @@ func ServerConfig() (*server.Config, error) {
 	}
 
 	cfg.Requestid = &requestid.Config{
-		Header: os.Getenv("GOREST_SERVER_REQUEST_ID_HEADER"),
+		Header: goresthelper.ReadEnvironmentStringWithDefault(
+			"GOREST_SERVER_REQUEST_ID_HEADER",
+			"",
+		),
 	}
 
+	compressLevel, err := goresthelper.ReadEnvironmentIntegerWithDefault(
+		"GOREST_SERVER_COMPRESS_LEVEL",
+		int(compress.LevelDefault),
+	)
+	if err != nil {
+		return &server.Config{}, fmt.Errorf("failed to parse GOREST_SERVER_COMPRESS_LEVEL: %w", err)
+	}
 	cfg.Compress = &compress.Config{
-		Level: compress.Level(envStrToInt("GOREST_SERVER_COMPRESS_LEVEL", int(compress.LevelDefault))),
+		Level: compress.Level(compressLevel),
 	}
 
 	cfg.Core, err = coreConfig()
 	if err != nil {
 		return &server.Config{}, fmt.Errorf("failed to configure fiber core: %w", err)
-	}
-
-	origins := envToStrArray("GOREST_SERVER_CORS_ORIGINS", []string{"http://localhost:3000", "http://127.0.0.1:3000"})
-	if len(origins) == 0 {
-		origins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
-	}
-
-	methods := envToStrArray("GOREST_SERVER_CORS_METHODS", []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
-	if len(methods) == 0 {
-		methods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
-	}
-
-	headers := envToStrArray("GOREST_SERVER_CORS_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"})
-	if len(headers) == 0 {
-		headers = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"}
 	}
 
 	cfg.Cors, err = corsConfig()

@@ -14,6 +14,8 @@ go test ./... -count=1
 
 They need no database credentials or external services. They do not prove that PostgreSQL connectivity, SQL statements, migrations, or TLS settings work against your server.
 
+The hardening-report HTTP integration test is separate from the PostgreSQL suite and does not connect to a database. It starts a local GOREST process to verify the endpoint's default-off behavior, peer-IP allowlisting, forwarded-header handling, report redaction, response headers, and format validation.
+
 ## Prepare a PostgreSQL integration database
 
 Integration tests use `GOREST_DB_*` connection settings from the process environment or `.env`. Before running them:
@@ -32,6 +34,12 @@ Run the PostgreSQL integration tests:
 
 ```sh
 make test-integration
+```
+
+Run the local hardening HTTP integration test independently:
+
+```sh
+make test-hardening-integration
 ```
 
 The suite checks that the server rejects a connection without the client certificate and accepts an encrypted mTLS connection with it. It also calls the user library directly against PostgreSQL, checking user creation and password hashing, listing, and rejection of an incorrect password. The HTTP flow starts the application with migrations and seed data enabled, then checks user creation, duplicate rejection, login, and authenticated listing. Test-created users are uniquely identified and removed afterward; the suite does not truncate tables or drop the database.

@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: run test unit-test test-integration test-postgres-mtls integration-report integration-json integration-reports coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
+.PHONY: run test unit-test test-integration test-postgres-mtls test-hardening-integration integration-report integration-json integration-reports coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
 
 run:
 	go run .
@@ -16,6 +16,9 @@ test-integration:
 
 test-postgres-mtls:
 	go test -tags=integration -v -count=1 -timeout=2m ./integration-test -run '^TestPostgreSQLMutualTLSRequiresClientCertificate$$'
+
+test-hardening-integration:
+	go test -tags=integration -run '^TestHardeningEndpointIntegration$$' -v -count=1 ./integration-test
 
 integration-report integration-json: integration-reports
 
