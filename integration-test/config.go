@@ -8,204 +8,202 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 
-	"github.com/elsyahtech/gorest"
-	"github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest/database"
-	"github.com/elsyahtech/gorest/log"
 	"github.com/joho/godotenv"
 )
 
-type mysqlTestConfig struct {
-	host     string
-	port     string
-	database string
-	username string
-	password string
-	tls      string
-	caPath   string
-	certPath string
-	keyPath  string
+type mongoTestConfig struct {
+	host        string
+	port        string
+	database    string
+	username    string
+	password    string
+	authSource  string
+	tls         string
+	caPath      string
+	certPath    string
+	keyPath     string
+	databaseDir string
 }
 
-func loadMySQLTestConfig() (mysqlTestConfig, error) {
+func loadMongoTestConfig() (mongoTestConfig, error) {
 	values, err := godotenv.Read("../.env")
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return mysqlTestConfig{}, fmt.Errorf("read .env: %w", err)
+		return mongoTestConfig{}, fmt.Errorf("read .env: %w", err)
 	}
-
-	value := func(testKey, appKey string) string {
-		if current := os.Getenv(testKey); current != "" {
+	value := func(key string) string {
+		if current, ok := os.LookupEnv(key); ok && current != "" {
 			return current
 		}
-		if configured := values[testKey]; configured != "" {
-			return configured
-		}
-		if current := os.Getenv(appKey); current != "" {
-			return current
-		}
-		return values[appKey]
+		return values[key]
 	}
 
-	usesApplicationConfig := false
-	for _, key := range []string{
-		"GOREST_TEST_MYSQL_HOST",
-		"GOREST_TEST_MYSQL_DATABASE",
-		"GOREST_TEST_MYSQL_USER",
-		"GOREST_TEST_MYSQL_PASSWORD",
-	} {
-		if os.Getenv(key) == "" && values[key] == "" {
-			usesApplicationConfig = true
+	if strings.EqualFold(strings.TrimSpace(value("GOREST_APP_ENV")), "production") {
+		return mongoTestConfig{}, errors.New("MongoDB integration tests refuse to run with GOREST_APP_ENV=production")
+	}
+
+	testConnectionKeys := []string{
+		"GOREST_TEST_MONGO_HOST",
+		"GOREST_TEST_MONGO_DATABASE",
+		"GOREST_TEST_MONGO_USER",
+		"GOREST_TEST_MONGO_PASSWORD",
+	}
+	useRuntimeConfig := true
+	for _, key := range testConnectionKeys {
+		if value(key) != "" {
+			useRuntimeConfig = false
 			break
 		}
 	}
-	if usesApplicationConfig {
-		environment := strings.ToLower(strings.TrimSpace(value("GOREST_TEST_MYSQL_APP_ENV", "GOREST_APP_ENV")))
-		if environment != "development" && environment != "test" && environment != "testing" {
-			return mysqlTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_APP_ENV=development, test, or testing")
-		}
-		if strings.ToLower(strings.TrimSpace(value("GOREST_TEST_MYSQL_DRIVER", "GOREST_DB_DRIVER"))) != "mysql" {
-			return mysqlTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_DB_DRIVER=mysql")
-		}
-		if strings.EqualFold(strings.TrimSpace(value("GOREST_TEST_MYSQL_DISABLE", "GOREST_DB_DISABLE")), "true") {
-			return mysqlTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_DB_DISABLE=false")
-		}
-	}
 
-	testValue := func(testKey, appKey string) string {
-		if current := os.Getenv(testKey); current != "" {
-			return current
-		}
-		if configured := values[testKey]; configured != "" {
+	runtimeValue := func(testKey, runtimeKey string) string {
+		if configured := value(testKey); configured != "" {
 			return configured
 		}
-		if usesApplicationConfig {
-			if current := os.Getenv(appKey); current != "" {
-				return current
-			}
-			return values[appKey]
+		if useRuntimeConfig {
+			return value(runtimeKey)
 		}
 		return ""
 	}
 
-	config := mysqlTestConfig{
-		host:     strings.TrimSpace(value("GOREST_TEST_MYSQL_HOST", "GOREST_DB_HOST")),
-		port:     strings.TrimSpace(value("GOREST_TEST_MYSQL_PORT", "GOREST_DB_PORT")),
-		database: strings.TrimSpace(value("GOREST_TEST_MYSQL_DATABASE", "GOREST_DB_NAME")),
-		username: value("GOREST_TEST_MYSQL_USER", "GOREST_DB_USER"),
-		password: value("GOREST_TEST_MYSQL_PASSWORD", "GOREST_DB_PASSWORD"),
-		tls:      strings.TrimSpace(value("GOREST_TEST_MYSQL_TLS", "GOREST_DB_TLS")),
-		caPath:   testValue("GOREST_TEST_MYSQL_CA_FILE", "GOREST_DB_CA_PATH"),
-		certPath: testValue("GOREST_TEST_MYSQL_CERT_FILE", "GOREST_DB_CERT_PATH"),
-		keyPath:  testValue("GOREST_TEST_MYSQL_KEY_FILE", "GOREST_DB_KEY_PATH"),
-	}
-	for _, path := range []*string{&config.caPath, &config.certPath, &config.keyPath} {
-		if *path != "" {
-			resolved, err := resolveMySQLTestPath(*path)
-			if err != nil {
-				return mysqlTestConfig{}, fmt.Errorf("resolve MySQL integration TLS file: %w", err)
-			}
-			*path = resolved
+	if useRuntimeConfig {
+		environment := strings.ToLower(strings.TrimSpace(value("GOREST_APP_ENV")))
+		if environment != "development" && environment != "test" && environment != "testing" {
+			return mongoTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_APP_ENV=development, test, or testing")
 		}
-	}
-	if config.port == "" {
-		config.port = "3306"
-	}
-	if config.tls == "" {
-		config.tls = "disable"
+		if !strings.EqualFold(strings.TrimSpace(value("GOREST_DB_DRIVER")), database.MONGO) {
+			return mongoTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_DB_DRIVER=mongo")
+		}
+		if strings.EqualFold(strings.TrimSpace(value("GOREST_DB_DISABLE")), "true") {
+			return mongoTestConfig{}, errors.New("GOREST_DB_* fallback requires GOREST_DB_DISABLE=false")
+		}
 	}
 
-	for key, value := range map[string]string{
-		"GOREST_TEST_MYSQL_HOST":     config.host,
-		"GOREST_TEST_MYSQL_DATABASE": config.database,
-		"GOREST_TEST_MYSQL_USER":     config.username,
-		"GOREST_TEST_MYSQL_PASSWORD": config.password,
-	} {
-		if value == "" {
-			return mysqlTestConfig{}, fmt.Errorf("%s is required", key)
-		}
+	config := mongoTestConfig{
+		host:       strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_HOST", "GOREST_DB_HOST")),
+		port:       strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_PORT", "GOREST_DB_PORT")),
+		database:   strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_DATABASE", "GOREST_DB_NAME")),
+		username:   strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_USER", "GOREST_DB_USER")),
+		password:   strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_PASSWORD", "GOREST_DB_PASSWORD")),
+		authSource: strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_AUTH_SOURCE", "GOREST_DB_AUTH_SOURCE")),
+		tls:        strings.ToLower(strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_TLS", "GOREST_DB_TLS"))),
+		caPath:     strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_CA_FILE", "GOREST_DB_CA_PATH")),
+		certPath:   strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_CERT_FILE", "GOREST_DB_CERT_PATH")),
+		keyPath:    strings.TrimSpace(runtimeValue("GOREST_TEST_MONGO_KEY_FILE", "GOREST_DB_KEY_PATH")),
 	}
-	if config.tls != "true" && config.tls != "disable" {
-		return mysqlTestConfig{}, errors.New("GOREST_TEST_MYSQL_TLS must be either true or disable")
+	if config.host == "" {
+		config.host = database.DefaultDatabaseHost
+	}
+	if config.port == "" {
+		config.port = database.MONGO_PORT
+	}
+	if config.authSource == "" {
+		config.authSource = "admin"
+	}
+	if config.tls == "" {
+		config.tls = database.TLSFalse
+	}
+	if config.tls != database.TLSFalse && config.tls != "true" {
+		return mongoTestConfig{}, errors.New("MongoDB TLS must be true or false")
+	}
+	if config.database == "" {
+		return mongoTestConfig{}, errors.New("GOREST_TEST_MONGO_DATABASE (or GOREST_DB_NAME) is required")
+	}
+	if (config.username == "") != (config.password == "") {
+		return mongoTestConfig{}, errors.New("MongoDB test username and password must be configured together")
+	}
+	if (config.certPath == "") != (config.keyPath == "") {
+		return mongoTestConfig{}, errors.New("MongoDB test client certificate and key must be configured together")
+	}
+	if config.certPath != "" && config.tls != "true" {
+		return mongoTestConfig{}, errors.New("MongoDB TLS=true is required when client certificates are configured")
+	}
+
+	confirmation := strings.TrimSpace(value("GOREST_TEST_MONGO_CONFIRM_DATABASE"))
+	if confirmation != config.database {
+		return mongoTestConfig{}, errors.New("set GOREST_TEST_MONGO_CONFIRM_DATABASE to exactly match the dedicated non-production MongoDB test database before running database-writing tests")
 	}
 	if !strings.HasSuffix(strings.ToLower(config.database), "_test") &&
 		!strings.HasSuffix(strings.ToLower(config.database), "_testing") &&
-		value("GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE", "GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE") != config.database {
-		return mysqlTestConfig{}, errors.New("integration database name must end in _test or _testing, or be explicitly allowed with GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE")
-	}
-	if value("GOREST_TEST_MYSQL_CONFIRM_DATABASE", "GOREST_TEST_MYSQL_CONFIRM_DATABASE") != config.database {
-		return mysqlTestConfig{}, errors.New("set GOREST_TEST_MYSQL_CONFIRM_DATABASE to the exact test database name to allow test data writes")
+		strings.TrimSpace(value("GOREST_TEST_MONGO_ALLOW_NON_TEST_DATABASE")) != config.database {
+		return mongoTestConfig{}, errors.New("MongoDB integration database must end in _test or _testing, or be explicitly allowed with GOREST_TEST_MONGO_ALLOW_NON_TEST_DATABASE")
 	}
 
+	root, err := filepath.Abs("..")
+	if err != nil {
+		return mongoTestConfig{}, fmt.Errorf("resolve repository root for MongoDB paths: %w", err)
+	}
+	for _, configuredPath := range []*string{&config.caPath, &config.certPath, &config.keyPath} {
+		if *configuredPath == "" {
+			continue
+		}
+		*configuredPath, err = resolveMongoTestPath(root, *configuredPath)
+		if err != nil {
+			return mongoTestConfig{}, fmt.Errorf("resolve MongoDB TLS file: %w", err)
+		}
+	}
+	config.databaseDir = filepath.Join(root, "app", "database")
 	return config, nil
 }
 
-func prepareMySQLIntegrationSchema(t *testing.T, testConfig mysqlTestConfig) {
-	t.Helper()
-	applyMySQLTestConfig(t, testConfig)
-
-	databaseConfig, err := config.DatabaseConfig()
+func resolveMongoTestPath(root, path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, path)
+	}
+	absolute, err := filepath.Abs(path)
 	if err != nil {
-		t.Fatalf("load MySQL migration configuration: %v", err)
+		return "", err
 	}
-	databaseDirectory, err := filepath.Abs(filepath.Join("..", "app", "database"))
+	info, err := os.Stat(absolute)
 	if err != nil {
-		t.Fatalf("resolve MySQL migration directory: %v", err)
+		return "", err
 	}
-	databaseConfig.DatabaseDirectory = databaseDirectory
-	databaseConfig.Migration = true
-	databaseConfig.Seeder = false
-
-	app := gorest.New(gorest.ConfigDefault)
-	app.Use(log.Run(log.ConfigDefault), database.Run(*databaseConfig))
-	t.Cleanup(func() {
-		if _, _, err := app.Close(); err != nil {
-			t.Errorf("close MySQL migration application: %v", err)
-		}
-	})
-	if err := app.RunDatabaseStartupTasks(); err != nil {
-		t.Fatalf("apply MySQL integration migration: %v", err)
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("%q is not a regular file", absolute)
 	}
+	return absolute, nil
 }
 
-func (config mysqlTestConfig) appEnvironment(serverPort, logDirectory, signatureKey string) map[string]string {
+func (config mongoTestConfig) appEnvironment(serverPort, logDirectory, signatureKey string) map[string]string {
 	return map[string]string{
-		"GOREST_APP_ENV":                 "testing",
-		"GOREST_APP_DEBUG":               "false",
-		"GOREST_APP_CHECK_FOR_UPDATES":   "false",
-		"GOREST_SERVER_HOST":             "127.0.0.1",
-		"GOREST_SERVER_PORT":             serverPort,
-		"GOREST_SERVER_LISTENER_NETWORK": "tcp4",
-		"GOREST_SERVER_CERT_FILE":        "",
-		"GOREST_SERVER_CERT_KEY_FILE":    "",
-		"GOREST_SERVER_CERT_CLIENT_FILE": "",
-		"GOREST_SERVER_ENABLE_PREFORK":   "false",
-		"GOREST_SERVER_CORS_ORIGINS":     "http://127.0.0.1",
-		"GOREST_DB_DISABLE":              "false",
-		"GOREST_DB_DRIVER":               "mysql",
-		"GOREST_DB_HOST":                 config.host,
-		"GOREST_DB_PORT":                 config.port,
-		"GOREST_DB_NAME":                 config.database,
-		"GOREST_DB_USER":                 config.username,
-		"GOREST_DB_PASSWORD":             config.password,
-		"GOREST_DB_TLS":                  config.tls,
-		"GOREST_DB_CA_PATH":              config.caPath,
-		"GOREST_DB_CERT_PATH":            config.certPath,
-		"GOREST_DB_KEY_PATH":             config.keyPath,
-		"GOREST_DB_MAX_IDLE_CONNECTIONS": "0",
-		"GOREST_DB_MIGRATION":            "false",
-		"GOREST_DB_SEEDER":               "false",
-		"GOREST_REDIS_DISABLE":           "true",
-		"GOREST_FILTER_SIGNATURE_KEY":    signatureKey,
-		"GOREST_FILTER_COOKIE_SECURE":    "false",
-		"GOREST_MONITORING_ALLOWED_IPS":  "127.0.0.1,::1",
-		"GOREST_MONITORING_DISABLE":      "false",
-		"GOREST_LOG_DIR":                 logDirectory,
-		"GOREST_LOG_FILE":                "integration-test.log",
-		"GOREST_LOG_CALLER":              "false",
-		"GOREST_LOG_MAX_FILE_SIZE":       "1",
-		"GOREST_LOG_MAX_BACKUPS":         "1",
-		"GOREST_LOG_MAX_AGE":             "1",
+		"GOREST_APP_ENV":                      "testing",
+		"GOREST_APP_DEBUG":                    "false",
+		"GOREST_APP_CHECK_FOR_UPDATES":        "false",
+		"GOREST_SERVER_HOST":                  "127.0.0.1",
+		"GOREST_SERVER_PORT":                  serverPort,
+		"GOREST_SERVER_LISTENER_NETWORK":      "tcp4",
+		"GOREST_SERVER_CERT_FILE":             "",
+		"GOREST_SERVER_CERT_KEY_FILE":         "",
+		"GOREST_SERVER_CERT_CLIENT_FILE":      "",
+		"GOREST_SERVER_ENABLE_PREFORK":        "false",
+		"GOREST_SERVER_CORS_ORIGINS":          "http://127.0.0.1",
+		"GOREST_DB_DISABLE":                   "false",
+		"GOREST_DB_DRIVER":                    database.MONGO,
+		"GOREST_DB_HOST":                      config.host,
+		"GOREST_DB_PORT":                      config.port,
+		"GOREST_DB_NAME":                      config.database,
+		"GOREST_DB_USER":                      config.username,
+		"GOREST_DB_PASSWORD":                  config.password,
+		"GOREST_DB_AUTH_SOURCE":               config.authSource,
+		"GOREST_DB_TLS":                       config.tls,
+		"GOREST_DB_CA_PATH":                   config.caPath,
+		"GOREST_DB_CERT_PATH":                 config.certPath,
+		"GOREST_DB_KEY_PATH":                  config.keyPath,
+		"GOREST_DB_DIRECTORY":                 config.databaseDir,
+		"GOREST_DB_MIGRATION":                 "false",
+		"GOREST_DB_SEEDER":                    "false",
+		"GOREST_DB_ALLOW_INSECURE_PRODUCTION": "false",
+		"GOREST_REDIS_DISABLE":                "true",
+		"GOREST_FILTER_SIGNATURE_KEY":         signatureKey,
+		"GOREST_FILTER_COOKIE_SECURE":         "false",
+		"GOREST_MONITORING_ALLOWED_IPS":       "127.0.0.1,::1",
+		"GOREST_MONITORING_DISABLE":           "false",
+		"GOREST_LOG_DIR":                      logDirectory,
+		"GOREST_LOG_FILE":                     "integration-test.log",
+		"GOREST_LOG_CALLER":                   "false",
+		"GOREST_LOG_MAX_FILE_SIZE":            "1",
+		"GOREST_LOG_MAX_BACKUPS":              "1",
+		"GOREST_LOG_MAX_AGE":                  "1",
 	}
 }

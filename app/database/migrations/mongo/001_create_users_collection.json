@@ -1,0 +1,34 @@
+{
+  "collection": "users",
+  "validator": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": ["id", "email", "password", "is_active", "created_at"],
+      "properties": {
+        "id": { "bsonType": "string" },
+        "email": { "bsonType": "string" },
+        "password": { "bsonType": "string" },
+        "is_active": { "bsonType": "bool" },
+        "created_at": { "bsonType": "date" },
+        "updated_at": { "bsonType": ["date", "null"] },
+        "deleted_at": { "bsonType": ["date", "null"] }
+      }
+    }
+  },
+  "indexes": [
+    {
+      "key": { "id": 1 },
+      "name": "uk_users_id",
+      "unique": true
+    },
+    {
+      "key": { "email": 1 },
+      "name": "uk_users_email",
+      "unique": true
+    },
+    {
+      "key": { "is_active": 1 },
+      "name": "idx_users_is_active"
+    }
+  ]
+}

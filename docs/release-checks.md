@@ -1,20 +1,21 @@
-# Release checks
+# Updating and validating the starter
 
-The release-check workflow runs source formatting, `go vet`, unit tests, the baseline linter, a secret scan, and a build. The separate test workflow runs unit tests and coverage, and runs MySQL E2E when the required external test database secrets are configured.
-
-Run the local gate with the repository's pinned tools:
+Run the local quality checks before sharing or deploying changes:
 
 ```sh
 make release-check
 ```
 
-To produce test evidence locally:
+This runs the repository's formatting, static analysis, unit tests, lint, secret scan, and build checks. The required Go and tool versions are pinned in the repository.
+
+To check MongoDB behavior, configure the dedicated non-production database described in [Testing](./testing.md), set the exact database confirmation, and run:
 
 ```sh
-make coverage
-make integration-reports
+make test-integration
 ```
 
-The integration report target runs the external MySQL suite once and writes both report formats and application coverage. In GitHub Actions, configure the required repository secrets and provision a reachable non-production schema before expecting E2E to run. When those secrets are absent, the E2E job is skipped; a skipped job is not a passing integration test. See [Testing and coverage](./testing.md#github-actions-ci) for CI setup and [MySQL configuration](./database.md) for database requirements. Retain generated reports together with the source commit, Go version, MySQL version, command, and sanitized environment description.
+For combined test output and application coverage, use `GOREST_REDIS_DISABLE=true make integration-reports` to skip the regular Redis test. This does not disable the separate Redis mTLS test when its dedicated settings or runtime client certificate/key are configured. The MongoDB suite writes to the confirmed database; optional Redis tests may connect to Redis if enabled.
 
-The Go toolchain version is `1.26.5`, as specified by `go.mod`. This starter currently targets GOREST v1.1.21. If your application needs a different GOREST version or connector capability, review the target version's [documentation and release history](https://github.com/elsyahtech/gorest/releases), assess configuration and API compatibility, and rerun the full release gate and MySQL integration suite before adopting it.
+GitHub Actions runs unit tests and isolated MongoDB integration-configuration checks. It does not connect to MongoDB because integration tests require an explicitly managed server and dedicated test database.
+
+The starter currently uses GOREST v1.1.21 and the Go version in `go.mod`. Before changing framework or Go versions, review the target version's documentation and compatibility notes, then rerun the applicable checks and MongoDB integration tests.

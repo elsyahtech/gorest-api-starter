@@ -8,6 +8,7 @@ import (
 
 	"github.com/elsyahtech/gorest"
 	"github.com/elsyahtech/gorest-api-starter/app/entity"
+	gorestdatabase "github.com/elsyahtech/gorest/database"
 )
 
 func (model *UserModel) CreateUser(req *entity.User) (string, int, error) {
@@ -17,6 +18,16 @@ func (model *UserModel) CreateUser(req *entity.User) (string, int, error) {
 	}
 
 	database := model.App.Database()
+	timeNow := time.Now()
+	req.CreatedAt = timeNow
+
+	if model.App.GetDBConfig().Driver == gorestdatabase.MONGO {
+		query := database.Table("users").Create(req)
+		if query.Error != nil {
+			return query.Message, query.HTTPCode, fmt.Errorf("%w", query.Error)
+		}
+		return query.Message, query.HTTPCode, nil
+	}
 
 	transaction, message, httpCode, err := database.BeginTx()
 	if err != nil {
@@ -28,10 +39,6 @@ func (model *UserModel) CreateUser(req *entity.User) (string, int, error) {
 			model.App.Log(gorest.Map{"error": err}).Error(message)
 		}
 	}()
-
-	timeNow := time.Now()
-
-	req.CreatedAt = timeNow
 
 	query := transaction.Table("users").Create(req)
 	if query.Error != nil {

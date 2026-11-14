@@ -4,10 +4,10 @@ go 1.26.5
 
 require (
 	github.com/elsyahtech/gorest v1.1.21
-	github.com/go-sql-driver/mysql v1.10.1
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	go.mongodb.org/mongo-driver/v2 v2.9.2
 )
 
 require (
@@ -19,6 +19,7 @@ require (
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/godror/godror v0.51.5 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
 	github.com/gofiber/schema v1.8.8 // indirect
@@ -50,7 +51,6 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect

@@ -9,7 +9,7 @@ import (
 	goresthelper "github.com/elsyahtech/gorest/helper"
 )
 
-// DatabaseConfig loads the MySQL connection settings and optional startup tasks.
+// DatabaseConfig loads the MongoDB connection settings and optional startup tasks.
 func DatabaseConfig() (*database.Config, error) {
 	cfg := database.ConfigDefault
 
@@ -23,44 +23,48 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_DISABLE: %w", err)
 	}
 
-	// This starter supports MySQL only.
 	cfg.Driver = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_DRIVER",
-		database.MYSQL,
+		database.MONGO,
 	)
-	if !strings.EqualFold(cfg.Driver, database.MYSQL) {
-		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the MySQL starter", database.MYSQL)
+	if !strings.EqualFold(cfg.Driver, database.MONGO) {
+		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the MongoDB starter", database.MONGO)
 	}
+	cfg.Driver = database.MONGO
 
-	cfg.Driver = database.MYSQL
-
-	cfg.Host = goresthelper.ReadEnvironmentStringWithDefault(
+	cfg.Host = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_HOST",
 		database.DefaultDatabaseHost,
-	)
-	cfg.Port = goresthelper.ReadEnvironmentStringWithDefault(
+	))
+	cfg.Port = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_PORT",
-		database.MYSQL_PORT,
-	)
-	cfg.Name = goresthelper.ReadEnvironmentStringWithDefault(
+		database.MONGO_PORT,
+	))
+	cfg.Name = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_NAME",
-		database.DefaultDatabaseName,
-	)
+		"",
+	))
+	if cfg.Name == "" {
+		return &database.Config{}, errors.New("GOREST_DB_NAME (MongoDB database name) cannot be empty")
+	}
 
 	cfg.Username = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_USER",
 		"",
 	))
-	if cfg.Username == "" {
-		return &database.Config{}, errors.New("DB Username cannot be empty")
-	}
-
 	cfg.Password = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_PASSWORD",
 		"",
 	))
-	if cfg.Password == "" {
-		return &database.Config{}, errors.New("DB Password cannot be empty")
+	if (cfg.Username == "") != (cfg.Password == "") {
+		return &database.Config{}, errors.New("GOREST_DB_USER and GOREST_DB_PASSWORD must be configured together")
+	}
+	cfg.AuthSource = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_AUTH_SOURCE",
+		"admin",
+	))
+	if cfg.AuthSource == "" {
+		cfg.AuthSource = "admin"
 	}
 
 	cfg.AllowInsecureProduction, err = goresthelper.ReadEnvironmentBooleanWithDefault(
@@ -71,64 +75,38 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_ALLOW_INSECURE_PRODUCTION: %w", err)
 	}
 
-	timeout, err := goresthelper.ReadEnvironmentDurationWithDefault(
+	cfg.TLS = strings.ToLower(strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_TLS",
+		database.TLSFalse,
+	)))
+	if cfg.TLS != database.TLSFalse && cfg.TLS != "true" {
+		return &database.Config{}, errors.New("GOREST_DB_TLS must be true or false for MongoDB")
+	}
+	cfg.SSLCAPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_CA_PATH",
+		"",
+	))
+	cfg.SSLCertPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_CERT_PATH",
+		"",
+	))
+	cfg.SSLKeyPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_KEY_PATH",
+		"",
+	))
+	if (cfg.SSLCertPath == "") != (cfg.SSLKeyPath == "") {
+		return &database.Config{}, errors.New("GOREST_DB_CERT_PATH and GOREST_DB_KEY_PATH must be configured together")
+	}
+	if cfg.SSLCertPath != "" && cfg.TLS != "true" {
+		return &database.Config{}, errors.New("GOREST_DB_TLS=true is required when MongoDB client certificates are configured")
+	}
+
+	cfg.Timeout, err = goresthelper.ReadEnvironmentDurationWithDefault(
 		"GOREST_DB_TIMEOUT",
 		database.DefaultTimeout,
 	)
 	if err != nil {
-		return &database.Config{}, fmt.Errorf("%w", err)
-	}
-
-	connectionMaxLifetime, err := goresthelper.ReadEnvironmentDurationWithDefault(
-		"GOREST_DB_CONNECTION_MAX_LIFETIME",
-		database.DefaultConnectionMaxLifetime,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("%w", err)
-	}
-
-	cfg.TLS = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_TLS",
-		database.TLSDisabled,
-	)
-
-	cfg.SSLCertPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CERT_PATH",
-		"",
-	)
-
-	cfg.SSLCAPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CA_PATH",
-		"",
-	)
-
-	cfg.SSLKeyPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_KEY_PATH",
-		"",
-	)
-
-	cfg.Charset = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CHARSET",
-		database.DefaultCharset,
-	)
-
-	cfg.Timeout = timeout
-	cfg.ConnectionMaxLifetime = connectionMaxLifetime
-
-	cfg.MaxOpenConnections, err = goresthelper.ReadEnvironmentIntegerWithDefault(
-		"GOREST_DB_MAX_OPEN_CONNECTIONS",
-		database.DefaultMaxOpenConnections,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MAX_OPEN_CONNECTIONS: %w", err)
-	}
-
-	cfg.MaxIdleConnections, err = goresthelper.ReadEnvironmentIntegerWithDefault(
-		"GOREST_DB_MAX_IDLE_CONNECTIONS",
-		database.DefaultMaxIdleConnections,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MAX_IDLE_CONNECTIONS: %w", err)
+		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_TIMEOUT: %w", err)
 	}
 
 	cfg.QueryLogging, err = goresthelper.ReadEnvironmentBooleanWithDefault(
@@ -143,7 +121,6 @@ func DatabaseConfig() (*database.Config, error) {
 		"GOREST_DB_DIRECTORY",
 		database.DefaultDatabaseDirectory,
 	)
-
 	cfg.Migration, err = goresthelper.ReadEnvironmentBooleanWithDefault(
 		"GOREST_DB_MIGRATION",
 		database.MigrationDisabled,
@@ -151,7 +128,6 @@ func DatabaseConfig() (*database.Config, error) {
 	if err != nil {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MIGRATION: %w", err)
 	}
-
 	cfg.Seeder, err = goresthelper.ReadEnvironmentBooleanWithDefault(
 		"GOREST_DB_SEEDER",
 		database.SeederDisabled,
@@ -159,12 +135,10 @@ func DatabaseConfig() (*database.Config, error) {
 	if err != nil {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_SEEDER: %w", err)
 	}
-
 	cfg.MigrationDirectory = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_MIGRATIONS_DIRECTORY",
 		database.DefaultMigrationDirectory,
 	)
-
 	cfg.SeederDirectory = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_SEEDERS_DIRECTORY",
 		database.DefaultSeederDirectory,

@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -26,43 +25,42 @@ import (
 	"github.com/elsyahtech/gorest-api-starter/app/config"
 	"github.com/elsyahtech/gorest/database"
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
-	testConfig, err := loadMySQLTestConfig()
+func TestMongoUserEndpointsOverHTTP(t *testing.T) {
+	testConfig, err := loadMongoTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepareMySQLIntegrationSchema(t, testConfig)
+	prepareMongoIntegrationSchema(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
 		t.Fatalf("load test database configuration: %v", err)
 	}
-	if dbConfig.Driver != database.MYSQL || dbConfig.Name != testConfig.database {
-		t.Fatalf("database configuration is not the selected MySQL test database")
+	if dbConfig.Driver != database.MONGO || dbConfig.Name != testConfig.database {
+		t.Fatal("database configuration is not the selected MongoDB test database")
 	}
-	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 15*time.Second)
+	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 20*time.Second)
 	testDB, message, err := database.New(databaseContext, dbConfig, gorest.DefaultTimezone)
 	cancelDatabase()
 	if err != nil {
-		t.Fatalf("connect to configured MySQL test database (%s): %v", message, err)
+		t.Fatalf("connect to configured MongoDB test database (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
-		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close MySQL test database connection: %v", err)
-		}
+		cleanupMongoTestConnection(t, testDB.Mongo)
 	})
-	requireUsersTable(t, testDB.SQL)
-	// Release the preflight connection before the application uses the test account.
-	testDB.SQL.SetMaxIdleConns(0)
+	collection := testDB.Mongo.Database(testConfig.database).Collection("users")
+	requireUsersCollection(t, testDB.Mongo, testConfig.database)
 
 	testID := uuid.NewString()
 	testEmail := "integration+" + strings.ReplaceAll(testID, "-", "") + "@example.test"
 	testPassword := "integration-test-password"
-	cleanupUser(t, testDB.SQL, testID, testEmail)
+	cleanupMongoUser(t, collection, testID, testEmail)
 	t.Cleanup(func() {
-		cleanupUser(t, testDB.SQL, testID, testEmail)
+		cleanupMongoUser(t, collection, testID, testEmail)
 	})
 
 	signatureKeyBytes := make([]byte, 48)
@@ -94,24 +92,26 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		testEmail,
 		testPassword,
 	)
-	t.Run("creates a MySQL user", func(t *testing.T) {
+	t.Run("creates a MongoDB user", func(t *testing.T) {
 		response := requestJSON(t, client, http.MethodPost, baseURL+"/users/create", createRequest, "")
 		if response.status != http.StatusOK || response.json["success"] != true {
 			t.Fatalf("create response = (%d, %s), want HTTP 200 success", response.status, response.body)
 		}
 
-		var storedID, storedEmail, storedPassword string
-		var active bool
-		err := testDB.SQL.QueryRow(
-			"SELECT id, email, password, is_active FROM users WHERE id = ?",
-			testID,
-		).Scan(&storedID, &storedEmail, &storedPassword, &active)
-		if err != nil {
-			t.Fatalf("read created user from MySQL: %v", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		var stored struct {
+			ID       string `bson:"id"`
+			Email    string `bson:"email"`
+			Password string `bson:"password"`
+			IsActive bool   `bson:"is_active"`
 		}
-		if storedID != testID || storedEmail != testEmail || !active || storedPassword == testPassword {
-			t.Fatalf("persisted user = (%q, %q, %t, password-set:%t), want created user with hashed password",
-				storedID, storedEmail, active, storedPassword != "")
+		if err := collection.FindOne(ctx, bson.M{"id": testID}).Decode(&stored); err != nil {
+			t.Fatalf("read created user from MongoDB: %v", err)
+		}
+		if stored.ID != testID || stored.Email != testEmail || !stored.IsActive || stored.Password == testPassword {
+			t.Fatalf("persisted MongoDB user = (%q, %q, %t, password-set:%t), want created user with hashed password",
+				stored.ID, stored.Email, stored.IsActive, stored.Password != "")
 		}
 	})
 
@@ -121,12 +121,14 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 			t.Fatalf("duplicate create response = (%d, %s), want a client/server error", response.status, response.body)
 		}
 
-		var count int
-		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM users WHERE id = ?", testID).Scan(&count); err != nil {
-			t.Fatalf("count duplicate test user rows: %v", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		count, err := collection.CountDocuments(ctx, bson.M{"id": testID})
+		if err != nil {
+			t.Fatalf("count duplicate test user documents: %v", err)
 		}
 		if count != 1 {
-			t.Fatalf("duplicate create left %d records for test ID, want exactly one", count)
+			t.Fatalf("duplicate create left %d documents for test ID, want exactly one", count)
 		}
 	})
 
@@ -218,47 +220,37 @@ func requestJSON(t *testing.T, client *http.Client, method, url, body, cookie st
 	}
 }
 
-func requireUsersTable(t *testing.T, db interface {
-	QueryRow(query string, args ...any) *sql.Row
-}) {
+func requireUsersCollection(t *testing.T, client *mongo.Client, databaseName string) {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	var tableCount int
-	if err := db.QueryRow(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
-	).Scan(&tableCount); err != nil {
-		t.Fatalf("check the MySQL users table: %v", err)
+	collections, err := client.Database(databaseName).ListCollectionNames(ctx, bson.D{{Key: "name", Value: "users"}})
+	if err != nil {
+		t.Fatalf("check the MongoDB users collection: %v", err)
 	}
-	if tableCount != 1 {
-		t.Fatal("MySQL test database does not contain the users table; apply the MySQL migration before running integration tests")
+	if len(collections) != 1 || collections[0] != "users" {
+		t.Fatal("MongoDB test database does not contain the users collection; apply the MongoDB migration before running integration tests")
 	}
 }
 
-func cleanupUser(t *testing.T, db interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}, id, email string) {
-	t.Helper()
-
-	if _, err := db.Exec("DELETE FROM users WHERE id = ? AND email = ?", id, email); err != nil {
-		t.Errorf("clean up integration user %s: %v", id, err)
-	}
-}
-
-func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
+func applyMongoTestConfig(t *testing.T, config mongoTestConfig) {
 	t.Helper()
 	for key, value := range map[string]string{
 		"GOREST_APP_ENV":                      "testing",
 		"GOREST_DB_DISABLE":                   "false",
-		"GOREST_DB_DRIVER":                    "mysql",
+		"GOREST_DB_DRIVER":                    database.MONGO,
 		"GOREST_DB_HOST":                      config.host,
 		"GOREST_DB_PORT":                      config.port,
 		"GOREST_DB_NAME":                      config.database,
 		"GOREST_DB_USER":                      config.username,
 		"GOREST_DB_PASSWORD":                  config.password,
+		"GOREST_DB_AUTH_SOURCE":               config.authSource,
 		"GOREST_DB_TLS":                       config.tls,
 		"GOREST_DB_CA_PATH":                   config.caPath,
 		"GOREST_DB_CERT_PATH":                 config.certPath,
 		"GOREST_DB_KEY_PATH":                  config.keyPath,
+		"GOREST_DB_DIRECTORY":                 config.databaseDir,
 		"GOREST_DB_MIGRATION":                 "false",
 		"GOREST_DB_SEEDER":                    "false",
 		"GOREST_DB_ALLOW_INSECURE_PRODUCTION": "false",
@@ -267,7 +259,30 @@ func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
 	}
 }
 
-func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string) (string, func()) {
+func prepareMongoIntegrationSchema(t *testing.T, testConfig mongoTestConfig) {
+	t.Helper()
+	applyMongoTestConfig(t, testConfig)
+
+	dbConfig, err := config.DatabaseConfig()
+	if err != nil {
+		t.Fatalf("load MongoDB migration configuration: %v", err)
+	}
+	dbConfig.Migration = true
+	dbConfig.Seeder = true
+
+	app := gorest.New(gorest.ConfigDefault)
+	app.Use(database.Run(*dbConfig))
+	t.Cleanup(func() {
+		if _, _, err := app.Close(); err != nil {
+			t.Errorf("close MongoDB migration application: %v", err)
+		}
+	})
+	if err := app.RunDatabaseStartupTasks(); err != nil {
+		t.Fatalf("apply MongoDB integration migration: %v", err)
+	}
+}
+
+func startApplication(t *testing.T, config mongoTestConfig, signatureKey string) (string, func()) {
 	t.Helper()
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
@@ -350,7 +365,7 @@ func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string)
 
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	client := &http.Client{Timeout: time.Second}
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(45 * time.Second)
 	ready := false
 	for time.Now().Before(deadline) {
 		select {

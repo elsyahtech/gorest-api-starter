@@ -1,6 +1,6 @@
-# MySQL configuration
+# MongoDB configuration
 
-This branch's application data layer is configured for MySQL. The runtime variables are read by `app/config/database.go` and mapped to GOREST's database configuration.
+This starter uses MongoDB through GOREST's database service. Runtime settings are read by `app/config/database.go`.
 
 ## Application connection
 
@@ -8,34 +8,26 @@ Set these variables in `.env`:
 
 | Variable | Purpose |
 |---|---|
-| `GOREST_DB_DRIVER` | Must be `mysql` for this starter. |
-| `GOREST_DB_HOST`, `GOREST_DB_PORT` | MySQL host/IP and port. |
-| `GOREST_DB_NAME` | Application database/schema name. |
-| `GOREST_DB_USER`, `GOREST_DB_PASSWORD` | Credentials; both are required. |
-| `GOREST_DB_TLS` | Set to `true` to require TLS and verify the server against trusted roots. |
-| `GOREST_DB_CA_PATH` | Optional PEM trust certificate for a private server CA. |
-| `GOREST_DB_CERT_PATH`, `GOREST_DB_KEY_PATH` | Optional client certificate and private key for MySQL mTLS; configure both together. |
-| `GOREST_DB_MIGRATION` | Enables the MySQL migration during application startup. |
-| `GOREST_DB_SEEDER` | Enables the sample seeder; disabled in the example configuration. |
+| `GOREST_DB_DRIVER` | Must be `mongo` for this starter. |
+| `GOREST_DB_HOST`, `GOREST_DB_PORT` | MongoDB server host and port (default `27017`). This starter builds a `mongodb://` host-and-port URI; it does not accept `mongodb+srv://` connection strings. |
+| `GOREST_DB_NAME` | MongoDB database name; required. |
+| `GOREST_DB_USER`, `GOREST_DB_PASSWORD` | Optional authentication credentials; configure both or neither. |
+| `GOREST_DB_AUTH_SOURCE` | Database that stores the user's credentials; defaults to `admin`. |
+| `GOREST_DB_TLS` | `true` enables TLS; `false` uses plaintext TCP. |
+| `GOREST_DB_CA_PATH` | Optional CA certificate file for server verification. |
+| `GOREST_DB_CERT_PATH`, `GOREST_DB_KEY_PATH` | Optional client certificate and key for mTLS; configure both together and enable TLS. |
+| `GOREST_DB_TIMEOUT` | MongoDB server-selection and connection timeout; defaults to GOREST's configured timeout. |
+| `GOREST_DB_MIGRATION` | Enables MongoDB collection and index migrations during application startup. |
+| `GOREST_DB_SEEDER` | Enables sample document insertion; disabled by default. |
 
-The `users` table is created by `app/database/migrations/mysql/001_create_users_table.sql`. Set `GOREST_DB_MIGRATION=true` for a controlled migration run, then turn it off for normal application startup. The down migration drops the `users` table; never run it against data that must be retained.
+For remote deployments, set `GOREST_DB_TLS=true`. Use a trusted certificate and hostname; configure `GOREST_DB_CA_PATH` when the MongoDB server certificate is signed by a private CA. For mTLS, provide both the client certificate and matching private key, and ensure the server requires and trusts that identity. Keep certificate verification enabled and protect private keys.
 
-Use a dedicated database account with only the required privileges. Do not copy production credentials into test files, shell history, or source control. The application does not make an application-level claim that an arbitrary `GOREST_DB_NAME` is safe for tests; the integration test has its own independent guardrails.
+The up migration in `app/database/migrations/mongo/` creates the `users` collection, validates its document fields, and adds unique indexes for `id` and `email` plus an index for `is_active`. The down migration drops the collection and its data; never run it against data that must be retained. The sample seeder is disabled by default and inserts three rows with placeholder password hashes, not usable login credentials. Its compensation file deletes only those fixed sample IDs.
 
-## Configure TLS, private CAs, and client certificates
-
-Set `GOREST_DB_TLS=true` to require MySQL TLS. GOREST v1.1.21 uses the Go/system trusted roots and verifies the server name against `GOREST_DB_HOST` when no CA path is set. A CA path is not required when the server certificate chains to a trusted system root.
-
-Ensure `GOREST_DB_HOST` matches a DNS name or IP address in the server certificate's subject alternative names.
-
-For a private CA, set `GOREST_DB_CA_PATH` to a readable PEM file containing the CA certificate used to verify the server. GOREST loads this certificate as the MySQL TLS trust pool and keeps hostname verification enabled. Do not substitute the server's leaf certificate or a file merely named `fullchain` unless your database administrator confirms it contains the CA trust chain.
-
-For mTLS, set `GOREST_DB_TLS=true`, `GOREST_DB_CA_PATH` to the CA that verifies the server, and both `GOREST_DB_CERT_PATH` and `GOREST_DB_KEY_PATH` to the client certificate and matching private key. The server must trust the client certificate issuer and require client authentication (for example, with a MySQL account configured as `REQUIRE X509`). GOREST v1.1.21 loads and presents this certificate/key pair while verifying the server certificate and hostname. Certificate and key paths are ignored when `GOREST_DB_TLS` names a registered MySQL TLS profile; use a profile only for additional custom TLS settings. Keep private keys readable only by the application account, and never disable certificate verification.
-
-The optional `TestMySQLMutualTLSRequiresClientCertificate` integration test uses the same direct CA and client-certificate path configuration as the application. Configure the `GOREST_TEST_MYSQL_MTLS_*` variables in `.env` or the environment, or allow it to use the runtime `GOREST_DB_*` settings in a development/test environment. Use a dedicated MySQL account that is restricted with `REQUIRE X509`. The test expects the server to reject the account without a client certificate (MySQL error 1045), then verifies a successful connection with the certificate and a non-empty `Ssl_cipher`. See [Testing and coverage](./testing.md#mysql-mutual-tls-integration-test), [GOREST MySQL TLS configuration](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md#mysql), [GOREST MySQL test results](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/testing-result/testing-result-mysql.md), and [go-sql-driver/mysql TLS configuration](https://github.com/go-sql-driver/mysql#tls). A non-empty `Ssl_cipher` confirms encryption; rejection without the client certificate and success with it verify the endpoint's client-certificate policy.
+The user model uses MongoDB document operations without wrapping each create in a transaction. This supports standalone MongoDB deployments; MongoDB multi-document transactions require a replica set or sharded cluster. See the [GOREST MongoDB guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/testing-result/testing-result-mongo.md) for framework-specific behavior and deployment considerations.
 
 ## Integration-test database
 
-Integration tests use the `GOREST_TEST_MYSQL_*` variables documented in the single `.env.example` template. They take precedence over application connection settings. Missing test connection values can fall back to `GOREST_DB_*` only for a MySQL database in a development or testing environment. The test harness normally requires a database name ending in `_test` or `_testing` and requires `GOREST_TEST_MYSQL_CONFIRM_DATABASE` to match it exactly before it writes test data.
+Integration tests accept explicit `GOREST_TEST_MONGO_*` settings. If all dedicated connection fields are blank, they may use `GOREST_DB_*` only when `GOREST_APP_ENV` is development, test, or testing and the MongoDB driver is enabled. In either case, tests refuse production mode and require `GOREST_TEST_MONGO_CONFIRM_DATABASE` to exactly match the target database. Names must end in `_test` or `_testing`, unless `GOREST_TEST_MONGO_ALLOW_NON_TEST_DATABASE` repeats the exact approved non-production name.
 
-The library and HTTP integration tests apply the up migration before testing; it creates the `users` table if it does not exist and does not drop existing tables. The tests create uniquely identified users and delete only their own rows during cleanup. Use a dedicated test database because migration tracking metadata is also written. See [Testing and coverage](./testing.md) for environment setup and safeguards.
+The test suite applies the up migration, which creates the collection and indexes if needed and records migration state, and runs the sample seeder once. It does not drop the database or run the down migration. Three sample documents with placeholder password hashes and migration/seeder history remain in the database; tests insert unique user documents and clean up only their own IDs/emails. Use a disposable, dedicated non-production database and an account limited to the required migration-metadata, collection, index, and document permissions. See the [testing guide](./testing.md).

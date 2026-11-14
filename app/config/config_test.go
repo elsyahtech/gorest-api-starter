@@ -118,6 +118,7 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_DB_NAME",
 	"GOREST_DB_USER",
 	"GOREST_DB_PASSWORD",
+	"GOREST_DB_AUTH_SOURCE",
 	"GOREST_DB_TLS",
 	"GOREST_DB_ALLOW_INSECURE_PRODUCTION",
 	"GOREST_DB_CERT_PATH",
@@ -210,7 +211,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "mysql-starter")
+	t.Setenv("GOREST_APP_NAME", "mongo-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -221,7 +222,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "mysql-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "mongo-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -701,96 +702,106 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToMySQL(t *testing.T) {
+func TestDatabaseConfigDefaultsToMongoAndRequiresDatabaseName(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a MySQL username and password")
+		t.Fatal("DatabaseConfig() succeeded without a MongoDB database name")
 	}
 
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
 	cfg, err := DatabaseConfig()
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "mysql" || cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want MySQL and configured credentials", cfg)
+	if cfg.Driver != "mongo" || cfg.Name != "gorest_test" || cfg.Host != "127.0.0.1" ||
+		cfg.Port != "27017" || cfg.TLS != "false" || cfg.AuthSource != "admin" {
+		t.Errorf("DatabaseConfig() = %+v, want MongoDB defaults and configured database", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonMySQLDrivers(t *testing.T) {
+func TestDatabaseConfigMapsMongoCredentialsAndAuthSource(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_USER", " integration-user ")
+	t.Setenv("GOREST_DB_PASSWORD", " integration-password ")
+	t.Setenv("GOREST_DB_AUTH_SOURCE", " app-auth ")
 
-	for _, driver := range []string{"postgres", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
+	cfg, err := DatabaseConfig()
+	if err != nil {
+		t.Fatalf("DatabaseConfig() error = %v", err)
+	}
+	if cfg.Username != "integration-user" || cfg.Password != "integration-password" ||
+		cfg.AuthSource != "app-auth" {
+		t.Errorf("MongoDB authentication config = (user:%q, authSource:%q), want trimmed values",
+			cfg.Username, cfg.AuthSource)
+	}
+}
+
+func TestDatabaseConfigRequiresCredentialsTogether(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_USER", "test-user")
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() accepted a username without a password")
+	}
+
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_PASSWORD", "test-password")
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() accepted a password without a username")
+	}
+}
+
+func TestDatabaseConfigRejectsNonMongoDrivers(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+
+	for _, driver := range []string{"mysql", "postgres", "sqlserver", "oracle", "scylla", "sqlite"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-MySQL driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-MongoDB driver %q", driver)
 			}
 		})
 	}
 }
 
-func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
+func TestDatabaseConfigMapsMongoTLSAndCertificatePaths(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "disable")
-	t.Setenv("GOREST_DB_CONNECTION_MAX_LIFETIME", "1h")
-	t.Setenv("GOREST_DB_MAX_OPEN_CONNECTIONS", "100")
-	t.Setenv("GOREST_DB_MAX_IDLE_CONNECTIONS", "10")
-
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() error = %v", err)
-	}
-	if cfg.ConnectionMaxLifetime != time.Hour ||
-		cfg.MaxOpenConnections != 100 ||
-		cfg.MaxIdleConnections != 10 {
-		t.Errorf("database pool config = (lifetime:%s, maxOpen:%d, maxIdle:%d), want (1h, 100, 10)",
-			cfg.ConnectionMaxLifetime, cfg.MaxOpenConnections, cfg.MaxIdleConnections)
-	}
-}
-
-func TestDatabaseConfigAllowsMySQLTLSWithoutCAPath(t *testing.T) {
-	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
 	t.Setenv("GOREST_DB_TLS", "true")
-	t.Setenv("GOREST_DB_CERT_PATH", "")
-	t.Setenv("GOREST_DB_CA_PATH", "")
-
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL TLS and no CA path error = %v", err)
-	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" {
-		t.Errorf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q), want TLS enabled without CA or client certificate",
-			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath)
-	}
-}
-
-func TestDatabaseConfigMapsMySQLMTLSCertificatePaths(t *testing.T) {
-	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "true")
-	t.Setenv("GOREST_DB_CA_PATH", "/test/ca.pem")
+	t.Setenv("GOREST_DB_CA_PATH", "/test/mongo-ca.pem")
 	t.Setenv("GOREST_DB_CERT_PATH", "/test/client-cert.pem")
 	t.Setenv("GOREST_DB_KEY_PATH", "/test/client-key.pem")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL mTLS paths error = %v", err)
+		t.Fatalf("DatabaseConfig() with MongoDB TLS paths error = %v", err)
 	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "/test/ca.pem" ||
+	if cfg.TLS != "true" || cfg.SSLCAPath != "/test/mongo-ca.pem" ||
 		cfg.SSLCertPath != "/test/client-cert.pem" || cfg.SSLKeyPath != "/test/client-key.pem" {
-		t.Fatalf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want configured mTLS paths",
+		t.Fatalf("MongoDB TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want configured mTLS paths",
 			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
+	}
+}
+
+func TestDatabaseConfigRejectsInvalidMongoTLSAndPartialCertificatePair(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		key  string
+		val  string
+	}{
+		{name: "invalid TLS mode", key: "GOREST_DB_TLS", val: "require"},
+		{name: "certificate without key", key: "GOREST_DB_CERT_PATH", val: "/test/client-cert.pem"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_DB_NAME", "gorest_test")
+			t.Setenv(test.key, test.val)
+			if _, err := DatabaseConfig(); err == nil {
+				t.Fatal("DatabaseConfig() accepted invalid MongoDB TLS configuration")
+			}
+		})
 	}
 }
