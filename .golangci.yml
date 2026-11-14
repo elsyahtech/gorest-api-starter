@@ -590,6 +590,7 @@ linters:
           severity: error
           arguments: [ "disable-if-not-top-level" ]
 
+
     gocyclo:
       min-complexity: 20
 

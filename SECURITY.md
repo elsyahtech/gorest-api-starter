@@ -40,3 +40,5 @@ This repository is a learning and implementation starter, not a production-secur
 See [Configuration, security, and deployment](./docs/configuration.md) for deployment guidance and [Testing and E2E coverage](./docs/testing.md) for the test scope and driver limitations.
 
 If a report concerns a vulnerability in GOREST or another dependency rather than this starter's integration, please also report it to the relevant upstream project through its private reporting channel.
+
+##
