@@ -1,10 +1,10 @@
-# GOREST MySQL API Starter
+# GOREST ScyllaDB API Starter
 
-A MySQL-focused application starter built with [GOREST](https://github.com/elsyahtech/gorest/tree/main). It demonstrates a small user API with authentication, password hashing, a MySQL data-access layer, automated unit tests, and opt-in library and HTTP integration tests against a separately configured MySQL test database.
+A ScyllaDB-focused application starter built with [GOREST](https://github.com/elsyahtech/gorest/tree/main). It demonstrates a user API with authentication, password hashing, wide-column persistence, automated unit tests, and opt-in integration tests against a separately confirmed ScyllaDB test keyspace.
 
 ## Documentation
 
-Start with the [documentation index](./docs/README.md). The guides cover setup, the active API, architecture, MySQL configuration, and testing evidence.
+Start with the [documentation index](./docs/README.md). The guides cover setup, the active API, architecture, ScyllaDB configuration, and testing.
 
 ## Included endpoints
 
@@ -19,36 +19,36 @@ These are starter examples, not a complete production identity or authorization 
 ## Requirements and quick start
 
 - Go `1.26.5` or newer.
-- A reachable MySQL server and a database for the application.
+- A reachable ScyllaDB server and a pre-created keyspace for the application.
 
-Copy `.env.example` to `.env`, provide the MySQL database name, username, password, and appropriate TLS settings, then apply the MySQL migration and start the application:
+Copy `.env.example` to `.env`, configure the ScyllaDB host, keyspace, optional credentials, and TLS settings, then apply the migration and start the application:
 
 ```sh
 cp .env.example .env
-# Edit .env with your MySQL settings.
+# Configure the ScyllaDB connection.
 GOREST_DB_MIGRATION=true go run .
 GOREST_DB_MIGRATION=false go run .
 ```
 
-The application loads `.env` when present and also supports environment-only startup. See [Getting started](./docs/getting-started.md) and [MySQL configuration](./docs/database.md) for the full setup.
+The application loads `.env` when present and also supports environment-only startup. ScyllaDB requires the keyspace to exist before connecting. See [Getting started](./docs/getting-started.md) and [ScyllaDB configuration](./docs/database.md) for the full setup.
 
 ## Tests and coverage
 
 ```sh
-make unit-test       # isolated unit tests; no database required
-make coverage        # unit coverage profile, text summary, and HTML report
-make test-integration # MySQL library/HTTP tests, plus configured TLS/mTLS and Redis checks
-make integration-reports # one integration run: readable and JSON reports plus app coverage
+make unit-test                  # no ScyllaDB server required
+make test-integration           # ScyllaDB connection, migration/seeder, library, and HTTP tests
+make test-scylla-connection     # connection-only ScyllaDB integration test
+make test-hardening-integration # local HTTP hardening test
+make integration-reports        # tagged integration suite and coverage reports
+make coverage                   # unit coverage reports
 ```
 
-Integration tests are opt-in and use the test-specific `GOREST_TEST_MYSQL_*` settings in the same `.env` file (or environment variables). They require a dedicated test database, normally ending in `_test` or `_testing`, and exact database-name confirmation before making test-data changes. The library and HTTP tests apply the up migration if needed, without dropping tables or seeding data. MySQL mTLS and Redis checks run when their corresponding external-service settings are configured; point them at non-production test services. Tests do not use Docker or a disposable local database. Read the [testing guide](./docs/testing.md) before running them.
+Integration tests write to the configured keyspace. Use a dedicated non-production test keyspace ending in `_test` or `_testing`, and set `GOREST_TEST_SCYLLA_CONFIRM_KEYSPACE` to its exact name. For a test keyspace with another name, also set `GOREST_TEST_SCYLLA_ALLOW_NON_TEST_KEYSPACE` to that exact name. Tests apply migrations and seed ten sample rows; they do not drop the keyspace. See the [testing guide](./docs/testing.md). Optional Redis tests may also connect to external Redis services when configured.
 
-The coverage outputs and integration reports are generated locally under `coverage/`; rerun the documented commands to regenerate evidence for the current source and environment. The integration report command runs E2E once and generates both report formats and an application coverage profile.
-
-GitHub Actions runs unit tests and coverage on pushes and pull requests. Its MySQL E2E job runs when the required external test database secrets are configured; see the [testing guide](./docs/testing.md#github-actions-ci).
+GitHub Actions runs unit tests and isolated ScyllaDB integration-configuration checks. It does not connect to ScyllaDB; database integration tests need an explicitly configured test server and keyspace.
 
 ## Framework and security
 
-The [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) is the framework reference. For MySQL TLS, private-CA, and mTLS setup, follow the [MySQL configuration guide](./docs/database.md#configure-tls-private-cas-and-client-certificates) and verify that the chosen connector supports your database's certificate policy. Do not commit credentials, private keys, or certificates. The default Redis wiring remains optional and disabled by the starter's `.env.example`; the current user endpoints do not depend on Redis.
+The [GOREST documentation](https://github.com/elsyahtech/gorest/tree/main/docs) is the framework reference. ScyllaDB transactions are not supported by the generic GOREST transaction API; this starter uses single-statement inserts. Enable verified TLS for remote deployments and protect client private keys. Do not commit credentials, keys, or certificates. Redis remains optional and disabled by the starter's `.env.example`; the current user endpoints do not depend on it.
 
 For private vulnerability reporting and the project's security policy, see [SECURITY.md](./SECURITY.md).

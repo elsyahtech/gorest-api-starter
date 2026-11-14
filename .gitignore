@@ -75,8 +75,7 @@ service-account*.json
 /coverage/
 /app/database/var/
 /cert/
-/postgres-cert/
-/mysql-cert/
+/scylla-cert/
 /app/handler/logs/
 /app/router/logs/
 /integration-test/logs/

@@ -1,41 +1,42 @@
-# MySQL configuration
+# ScyllaDB configuration
 
-This branch's application data layer is configured for MySQL. The runtime variables are read by `app/config/database.go` and mapped to GOREST's database configuration.
+This branch's application data layer uses ScyllaDB through GOREST v1.1.21. Runtime variables are read by `app/config/database.go` and mapped to GOREST's database configuration.
 
 ## Application connection
 
-Set these variables in `.env`:
+Configure these variables in `.env` or the process environment:
 
 | Variable | Purpose |
 |---|---|
-| `GOREST_DB_DRIVER` | Must be `mysql` for this starter. |
-| `GOREST_DB_HOST`, `GOREST_DB_PORT` | MySQL host/IP and port. |
-| `GOREST_DB_NAME` | Application database/schema name. |
-| `GOREST_DB_USER`, `GOREST_DB_PASSWORD` | Credentials; both are required. |
-| `GOREST_DB_TLS` | Set to `true` to require TLS and verify the server against trusted roots. |
+| `GOREST_DB_DRIVER` | Must be `scylla` for this starter. |
+| `GOREST_DB_HOST`, `GOREST_DB_PORT` | ScyllaDB host/IP and native CQL port; the port defaults to `9042`. |
+| `GOREST_DB_NAME` | Required name of an already-created keyspace. |
+| `GOREST_DB_USER`, `GOREST_DB_PASSWORD` | Optional credentials; configure both or neither. |
+| `GOREST_DB_TLS` | `enable` verifies the ScyllaDB server certificate and hostname; `disable` turns TLS off. |
 | `GOREST_DB_CA_PATH` | Optional PEM trust certificate for a private server CA. |
-| `GOREST_DB_CERT_PATH`, `GOREST_DB_KEY_PATH` | Optional client certificate and private key for MySQL mTLS; configure both together. |
-| `GOREST_DB_MIGRATION` | Enables the MySQL migration during application startup. |
-| `GOREST_DB_SEEDER` | Enables the sample seeder; disabled in the example configuration. |
+| `GOREST_DB_CERT_PATH`, `GOREST_DB_KEY_PATH` | Optional client certificate and private key for mTLS; configure both together. |
+| `GOREST_DB_TIMEOUT` | Connection/query timeout, parsed as a Go duration (for example `5s`). |
+| `GOREST_DB_MIGRATION` | Enables the ScyllaDB migration during application startup. |
+| `GOREST_DB_SEEDER` | Enables sample data; disabled in `.env.example`. |
 
-The `users` table is created by `app/database/migrations/mysql/001_create_users_table.sql`. Set `GOREST_DB_MIGRATION=true` for a controlled migration run, then turn it off for normal application startup. The down migration drops the `users` table; never run it against data that must be retained.
+ScyllaDB does not create the configured keyspace. Provision it before starting the application, then run with `GOREST_DB_MIGRATION=true` to create the users table and email index. Turn migration off for normal startup. The down migration drops the users table and its index; do not run it if the data must be retained. Migration and seeder metadata remain in the keyspace.
 
-Use a dedicated database account with only the required privileges. Do not copy production credentials into test files, shell history, or source control. The application does not make an application-level claim that an arbitrary `GOREST_DB_NAME` is safe for tests; the integration test has its own independent guardrails.
+Use a dedicated database account with only the permissions required for the selected application and controlled schema-migration operations. Migrations use GOREST's ScyllaDB migration lock and therefore require the corresponding table and lightweight-transaction permissions. Confirm those permissions with your ScyllaDB administrator before running migrations.
 
-## Configure TLS, private CAs, and client certificates
+## TLS and client certificates
 
-Set `GOREST_DB_TLS=true` to require MySQL TLS. GOREST v1.1.21 uses the Go/system trusted roots and verifies the server name against `GOREST_DB_HOST` when no CA path is set. A CA path is not required when the server certificate chains to a trusted system root.
+Set `GOREST_DB_TLS=enable` for remote connections. GOREST uses Go's system trust roots when no private CA path is configured and verifies the server name against `GOREST_DB_HOST`. Ensure that the host matches a DNS name or IP address in the server certificate's subject alternative names.
 
-Ensure `GOREST_DB_HOST` matches a DNS name or IP address in the server certificate's subject alternative names.
+For a private CA, set `GOREST_DB_CA_PATH` to a readable PEM file containing the CA certificate used to verify the server. Do not substitute the server's leaf certificate unless the ScyllaDB administrator explicitly confirms that trust model.
 
-For a private CA, set `GOREST_DB_CA_PATH` to a readable PEM file containing the CA certificate used to verify the server. GOREST loads this certificate as the MySQL TLS trust pool and keeps hostname verification enabled. Do not substitute the server's leaf certificate or a file merely named `fullchain` unless your database administrator confirms it contains the CA trust chain.
+For mTLS, set `GOREST_DB_TLS=enable`, configure the CA path when the server uses a private CA, and set both `GOREST_DB_CERT_PATH` and `GOREST_DB_KEY_PATH` to a matching client certificate and private key. The server must trust the client certificate issuer and require client authentication. The starter rejects an unpaired certificate and key. Restrict key-file permissions and never disable certificate verification for production traffic.
 
-For mTLS, set `GOREST_DB_TLS=true`, `GOREST_DB_CA_PATH` to the CA that verifies the server, and both `GOREST_DB_CERT_PATH` and `GOREST_DB_KEY_PATH` to the client certificate and matching private key. The server must trust the client certificate issuer and require client authentication (for example, with a MySQL account configured as `REQUIRE X509`). GOREST v1.1.21 loads and presents this certificate/key pair while verifying the server certificate and hostname. Certificate and key paths are ignored when `GOREST_DB_TLS` names a registered MySQL TLS profile; use a profile only for additional custom TLS settings. Keep private keys readable only by the application account, and never disable certificate verification.
+GOREST v1.1.21's ScyllaDB TLS configuration accepts `enable` or `disable`; see the [GOREST configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md) and [GOREST ScyllaDB implementation](https://github.com/elsyahtech/gorest/tree/v1.1.21/database).
 
-The optional `TestMySQLMutualTLSRequiresClientCertificate` integration test uses the same direct CA and client-certificate path configuration as the application. Configure the `GOREST_TEST_MYSQL_MTLS_*` variables in `.env` or the environment, or allow it to use the runtime `GOREST_DB_*` settings in a development/test environment. Use a dedicated MySQL account that is restricted with `REQUIRE X509`. The test expects the server to reject the account without a client certificate (MySQL error 1045), then verifies a successful connection with the certificate and a non-empty `Ssl_cipher`. See [Testing and coverage](./testing.md#mysql-mutual-tls-integration-test), [GOREST MySQL TLS configuration](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md#mysql), [GOREST MySQL test results](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/testing-result/testing-result-mysql.md), and [go-sql-driver/mysql TLS configuration](https://github.com/go-sql-driver/mysql#tls). A non-empty `Ssl_cipher` confirms encryption; rejection without the client certificate and success with it verify the endpoint's client-certificate policy.
+## Integration-test keyspace
 
-## Integration-test database
+Database-writing tests use the `GOREST_TEST_SCYLLA_*` variables in `.env.example`, taking precedence over application connection settings. Configure an isolated, non-production keyspace and set `GOREST_TEST_SCYLLA_CONFIRM_KEYSPACE` to its exact name before running them. Keyspaces should end in `_test` or `_testing`; another name requires the additional exact-name opt-in `GOREST_TEST_SCYLLA_ALLOW_NON_TEST_KEYSPACE`.
 
-Integration tests use the `GOREST_TEST_MYSQL_*` variables documented in the single `.env.example` template. They take precedence over application connection settings. Missing test connection values can fall back to `GOREST_DB_*` only for a MySQL database in a development or testing environment. The test harness normally requires a database name ending in `_test` or `_testing` and requires `GOREST_TEST_MYSQL_CONFIRM_DATABASE` to match it exactly before it writes test data.
+The library and HTTP tests apply the up migration and seeder. The tests do not drop the keyspace, tables, or seed data; they clean up only the uniquely identified user rows they create. Migration/seeder metadata and ten sample rows remain after the run. Use a disposable test keyspace or review and remove those specific test artifacts under your own retention process.
 
-The library and HTTP integration tests apply the up migration before testing; it creates the `users` table if it does not exist and does not drop existing tables. The tests create uniquely identified users and delete only their own rows during cleanup. Use a dedicated test database because migration tracking metadata is also written. See [Testing and coverage](./testing.md) for environment setup and safeguards.
+When dedicated test connection settings are absent, `GOREST_DB_*` fallback is allowed only when `GOREST_APP_ENV` is `development`, `test`, or `testing`, the configured driver is ScyllaDB, and the database is enabled. Exact keyspace confirmation is still required. Never point the suite at production.

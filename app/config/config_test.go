@@ -123,13 +123,8 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_DB_CERT_PATH",
 	"GOREST_DB_KEY_PATH",
 	"GOREST_DB_CA_PATH",
-	"GOREST_DB_CHARSET",
 	"GOREST_DB_TIMEOUT",
-	"GOREST_DB_CONNECTION_MAX_LIFETIME",
-	"GOREST_DB_MAX_OPEN_CONNECTIONS",
-	"GOREST_DB_MAX_IDLE_CONNECTIONS",
 	"GOREST_DB_QUERY_LOGGING",
-	"GOREST_DB_LIB_DIR",
 	"GOREST_DB_DIRECTORY",
 	"GOREST_DB_MIGRATION",
 	"GOREST_DB_SEEDER",
@@ -210,7 +205,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "mysql-starter")
+	t.Setenv("GOREST_APP_NAME", "scylla-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -221,7 +216,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "mysql-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "scylla-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -373,10 +368,9 @@ func TestConfigRejectsInvalidIntegerEnvironmentValues(t *testing.T) {
 		},
 		{
 			name: "database",
-			key:  "GOREST_DB_MAX_OPEN_CONNECTIONS",
+			key:  "GOREST_DB_TIMEOUT",
 			configure: func(t *testing.T) {
-				t.Setenv("GOREST_DB_USER", "test-user")
-				t.Setenv("GOREST_DB_PASSWORD", "test-password")
+				t.Setenv("GOREST_DB_NAME", "gorest_test")
 			},
 			load: func() error {
 				_, err := DatabaseConfig()
@@ -701,96 +695,104 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToMySQL(t *testing.T) {
+func TestDatabaseConfigDefaultsToScyllaAndRequiresKeyspace(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a MySQL username and password")
+		t.Fatal("DatabaseConfig() succeeded without a ScyllaDB keyspace")
 	}
 
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
 	cfg, err := DatabaseConfig()
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "mysql" || cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want MySQL and configured credentials", cfg)
+	if cfg.Driver != "scylla" || cfg.Name != "gorest_test" || cfg.Host != "127.0.0.1" ||
+		cfg.Port != "9042" || cfg.TLS != "disable" {
+		t.Errorf("DatabaseConfig() = %+v, want ScyllaDB defaults and configured keyspace", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonMySQLDrivers(t *testing.T) {
+func TestDatabaseConfigMapsScyllaCredentials(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_USER", " integration-user ")
+	t.Setenv("GOREST_DB_PASSWORD", " integration-password ")
 
-	for _, driver := range []string{"postgres", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
+	cfg, err := DatabaseConfig()
+	if err != nil {
+		t.Fatalf("DatabaseConfig() error = %v", err)
+	}
+	if cfg.Username != "integration-user" || cfg.Password != "integration-password" {
+		t.Errorf("ScyllaDB credentials = (%q, %q), want trimmed values", cfg.Username, cfg.Password)
+	}
+}
+
+func TestDatabaseConfigRequiresCredentialsTogether(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_USER", "test-user")
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() accepted a username without a password")
+	}
+
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_PASSWORD", "test-password")
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() accepted a password without a username")
+	}
+}
+
+func TestDatabaseConfigRejectsNonScyllaDrivers(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+
+	for _, driver := range []string{"mysql", "postgres", "sqlserver", "oracle", "mongo", "sqlite"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-MySQL driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-ScyllaDB driver %q", driver)
 			}
 		})
 	}
 }
 
-func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
+func TestDatabaseConfigMapsScyllaTLSPaths(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "disable")
-	t.Setenv("GOREST_DB_CONNECTION_MAX_LIFETIME", "1h")
-	t.Setenv("GOREST_DB_MAX_OPEN_CONNECTIONS", "100")
-	t.Setenv("GOREST_DB_MAX_IDLE_CONNECTIONS", "10")
+	t.Setenv("GOREST_DB_NAME", "gorest_test")
+	t.Setenv("GOREST_DB_TLS", " ENABLE ")
+	t.Setenv("GOREST_DB_CA_PATH", " /test/ca.pem ")
+	t.Setenv("GOREST_DB_CERT_PATH", " /test/client-cert.pem ")
+	t.Setenv("GOREST_DB_KEY_PATH", " /test/client-key.pem ")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() error = %v", err)
+		t.Fatalf("DatabaseConfig() with ScyllaDB mTLS paths error = %v", err)
 	}
-	if cfg.ConnectionMaxLifetime != time.Hour ||
-		cfg.MaxOpenConnections != 100 ||
-		cfg.MaxIdleConnections != 10 {
-		t.Errorf("database pool config = (lifetime:%s, maxOpen:%d, maxIdle:%d), want (1h, 100, 10)",
-			cfg.ConnectionMaxLifetime, cfg.MaxOpenConnections, cfg.MaxIdleConnections)
-	}
-}
-
-func TestDatabaseConfigAllowsMySQLTLSWithoutCAPath(t *testing.T) {
-	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "true")
-	t.Setenv("GOREST_DB_CERT_PATH", "")
-	t.Setenv("GOREST_DB_CA_PATH", "")
-
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL TLS and no CA path error = %v", err)
-	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" {
-		t.Errorf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q), want TLS enabled without CA or client certificate",
-			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath)
-	}
-}
-
-func TestDatabaseConfigMapsMySQLMTLSCertificatePaths(t *testing.T) {
-	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "mysql")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "true")
-	t.Setenv("GOREST_DB_CA_PATH", "/test/ca.pem")
-	t.Setenv("GOREST_DB_CERT_PATH", "/test/client-cert.pem")
-	t.Setenv("GOREST_DB_KEY_PATH", "/test/client-key.pem")
-
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() with MySQL mTLS paths error = %v", err)
-	}
-	if cfg.TLS != "true" || cfg.SSLCAPath != "/test/ca.pem" ||
+	if cfg.TLS != "enable" || cfg.SSLCAPath != "/test/ca.pem" ||
 		cfg.SSLCertPath != "/test/client-cert.pem" || cfg.SSLKeyPath != "/test/client-key.pem" {
-		t.Fatalf("MySQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want configured mTLS paths",
+		t.Fatalf("ScyllaDB TLS fields = (%q, %q, %q, %q), want normalized values",
 			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
+	}
+}
+
+func TestDatabaseConfigRejectsInvalidScyllaTLSConfiguration(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		key  string
+		val  string
+	}{
+		{name: "invalid TLS mode", key: "GOREST_DB_TLS", val: "true"},
+		{name: "certificate without key", key: "GOREST_DB_CERT_PATH", val: "/test/client-cert.pem"},
+		{name: "CA path while TLS is disabled", key: "GOREST_DB_CA_PATH", val: "/test/ca.pem"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_DB_NAME", "gorest_test")
+			t.Setenv(test.key, test.val)
+			if _, err := DatabaseConfig(); err == nil {
+				t.Fatal("DatabaseConfig() accepted invalid ScyllaDB TLS configuration")
+			}
+		})
 	}
 }

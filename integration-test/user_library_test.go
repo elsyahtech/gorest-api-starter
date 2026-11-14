@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"strings"
 	"testing"
@@ -21,26 +20,25 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestMySQLUserLibraryAgainstDatabase(t *testing.T) {
-	testConfig, err := loadMySQLTestConfig()
+func TestScyllaUserLibraryAgainstDatabase(t *testing.T) {
+	testConfig, err := loadScyllaTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepareMySQLIntegrationSchema(t, testConfig)
+	prepareScyllaIntegrationSchema(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
-		t.Fatalf("load MySQL library-test configuration: %v", err)
+		t.Fatalf("load ScyllaDB library-test configuration: %v", err)
 	}
 	dbConfig.Migration = false
 	dbConfig.Seeder = false
-	dbConfig.MaxIdleConnections = 0
 
 	app := gorest.New(gorest.ConfigDefault)
 	app.Use(log.Run(log.ConfigDefault), database.Run(*dbConfig))
 	t.Cleanup(func() {
 		if _, _, err := app.Close(); err != nil {
-			t.Errorf("close MySQL library-test application: %v", err)
+			t.Errorf("close ScyllaDB library-test application: %v", err)
 		}
 	})
 
@@ -49,19 +47,17 @@ func TestMySQLUserLibraryAgainstDatabase(t *testing.T) {
 	testDB, message, err := database.New(ctx, &preflightConfig, gorest.DefaultTimezone)
 	cancel()
 	if err != nil {
-		t.Fatalf("connect to MySQL library-test database (%s): %v", message, err)
+		t.Fatalf("connect to ScyllaDB library-test keyspace (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
-		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close MySQL library-test connection: %v", err)
-		}
+		closeScyllaDatabase(t, testDB, &preflightConfig)
 	})
 
 	userID := uuid.NewString()
 	email := "library+" + strings.ReplaceAll(userID, "-", "") + "@example.test"
-	cleanupMySQLLibraryTestUser(t, testDB.SQL, userID)
+	cleanupScyllaUser(t, testDB, &preflightConfig, userID)
 	t.Cleanup(func() {
-		cleanupMySQLLibraryTestUser(t, testDB.SQL, userID)
+		cleanupScyllaUser(t, testDB, &preflightConfig, userID)
 	})
 
 	userLibrary := library.NewUserLibrary(app, model.NewUserModel(app))
@@ -74,11 +70,14 @@ func TestMySQLUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	message, status, err := userLibrary.CreateUser(user)
 	if err != nil || status != http.StatusOK || message == "" {
-		t.Fatalf("CreateUser() = (%q, %d, %v), want successful MySQL persistence", message, status, err)
+		t.Fatalf("CreateUser() = (%q, %d, %v), want successful ScyllaDB persistence", message, status, err)
 	}
 
 	var storedPassword string
-	if err := testDB.SQL.QueryRow("SELECT password FROM users WHERE id = ?", userID).Scan(&storedPassword); err != nil {
+	queryContext, cancelQuery := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelQuery()
+	if err := testDB.Scylla.Query("SELECT password FROM users WHERE id = ?", userID).
+		WithContext(queryContext).Scan(&storedPassword); err != nil {
 		t.Fatalf("read password persisted by UserLibrary: %v", err)
 	}
 	if storedPassword == plainPassword || storedPassword == "" {
@@ -86,12 +85,12 @@ func TestMySQLUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	passwordMatches, _, _, err := helper.VerifyArgon(plainPassword, storedPassword)
 	if err != nil || !passwordMatches {
-		t.Fatalf("verify MySQL password hash: matches=%t, err=%v", passwordMatches, err)
+		t.Fatalf("verify ScyllaDB password hash: matches=%t, err=%v", passwordMatches, err)
 	}
 
 	users, message, status, err := userLibrary.GetUsers()
 	if err != nil || status != http.StatusOK || message == "" || users == nil {
-		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want MySQL users", users == nil, message, status, err)
+		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want ScyllaDB users", users == nil, message, status, err)
 	}
 	found := false
 	for _, listedUser := range *users {
@@ -113,11 +112,20 @@ func TestMySQLUserLibraryAgainstDatabase(t *testing.T) {
 	}
 }
 
-func cleanupMySQLLibraryTestUser(t *testing.T, db interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}, id string) {
+func cleanupScyllaUser(t *testing.T, db *database.Database, cfg *database.Config, id string) {
 	t.Helper()
-	if _, err := db.Exec("DELETE FROM users WHERE id = ?", id); err != nil {
-		t.Errorf("clean up MySQL library-test user %s: %v", id, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, _, err := db.ExecCQL(ctx, cfg, "DELETE FROM users WHERE id = ?", id); err != nil {
+		t.Errorf("clean up ScyllaDB library-test user %s: %v", id, err)
+	}
+}
+
+func closeScyllaDatabase(t *testing.T, db *database.Database, cfg *database.Config) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, _, err := db.Close(ctx, cfg); err != nil {
+		t.Errorf("close ScyllaDB integration connection: %v", err)
 	}
 }

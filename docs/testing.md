@@ -1,36 +1,36 @@
 # Testing and coverage
 
-This guide describes the test strategy for the active MySQL user API and the GOREST services it uses. Unit tests are isolated and do not connect to external services. The tagged integration suite verifies direct library operations and builds and starts the application for HTTP E2E requests against a separately configured external MySQL test database. MySQL mTLS and Redis checks run when their external test-service settings are configured. No Docker or local disposable database is used.
+Unit tests do not require a ScyllaDB server. The tagged database integration tests connect to a separately configured external ScyllaDB test keyspace and exercise migrations, seeded data, library calls, and HTTP behavior. No Docker or disposable local database is used.
 
 ## Test layout
 
 ```text
 app/
-  config/*_test.go          configuration and validation tests
-  handler/                  HTTP handlers (behavior exercised by HTTP E2E tests)
-  library/*_test.go         validation tests that do not require a database
+  config/*_test.go          application configuration and validation
+  library/*_test.go         isolated input validation
   model/*_test.go           model input guards
   router/*_test.go          route registration and authentication wiring
-  view/*_test.go            entity-to-response mapping tests
+  view/*_test.go            entity-to-response mapping
 integration-test/
-  config.go                 test-only environment and database-safety checks
-  hardening_http_test.go    hardening endpoint HTTP integration test (no database)
-  user_library_test.go      user library behavior against MySQL
-  users_http_test.go        HTTP E2E flow against the running application
-  mysql_mtls_test.go        optional MySQL client-certificate verification
-  redis_integration_test.go optional real Redis service test
-  redis_mtls_test.go        optional Redis client-certificate verification
+  config.go                 ScyllaDB test configuration and safety checks
+  config_test.go            configuration safety unit tests
+  scylla_connection_test.go external ScyllaDB connection test
+  scylla_mtls_test.go       optional client-certificate connection test
+  user_library_test.go      user library behavior against ScyllaDB
+  users_http_test.go        HTTP E2E flow against ScyllaDB
+  hardening_http_test.go    HTTP hardening-report integration test
+  redis*_test.go            optional external Redis checks
 scripts/
-  integration-report.go     one-run test reporting and application coverage
+  integration-report.go     single-run integration reports and app coverage
 ```
 
-The current code has no separate service package or application-owned middleware package requiring independent unit tests. GOREST's authentication filter is verified through the HTTP integration flow.
+The hardening-report test runs independently without a database:
 
-The hardening-report integration test lives under `integration-test/` and starts a separate GOREST HTTP process without a database. Run it independently with `make test-hardening-integration`. It verifies that the route is disabled by default, denies non-allowlisted peers despite spoofed forwarded headers, serves redacted JSON/HTML reports with no-store headers, and rejects unsupported formats.
+```sh
+make test-hardening-integration
+```
 
 ## Unit tests
-
-Run without MySQL:
 
 ```sh
 make unit-test
@@ -38,123 +38,78 @@ make unit-test
 go test ./... -count=1
 ```
 
-Examples of isolated unit checks include rejected invalid library/model inputs, configuration validation, route registration and authentication wiring, and public response mapping that omits password fields. Password hashing, persistence, login rejection, and user listing through the library are verified against MySQL by `TestMySQLUserLibraryAgainstDatabase`; HTTP request and response behavior is verified by `TestMySQLUserEndpointsOverHTTP`.
+Unit tests cover configuration validation, input guards, route/authentication wiring, and public response mapping. ScyllaDB-dependent persistence and HTTP behavior are covered by the tagged integration tests.
 
-## Configure the external MySQL integration test
+## Configure the ScyllaDB integration tests
 
-1. Prepare a dedicated MySQL test database on the host/IP and port to be tested. The schema name must end with `_test` or `_testing`; for example, `gorest_starter_test`.
-2. The library and HTTP integration tests apply the up migration automatically. It creates the `users` table if needed and records migration state; it does not drop tables or seed data. Use a dedicated test schema and an account permitted to create the table and migration metadata.
-3. Use the existing `.env` copied from `.env.example` and fill in the `GOREST_TEST_MYSQL_*` fields there. Alternatively, export those variables in the shell. Do not create a second integration environment file. Missing test connection values fall back to `GOREST_DB_*` only when `GOREST_APP_ENV` is `development`, `test`, or `testing`, the driver is MySQL, and the database is enabled. Prefer explicit test connection values to keep the test target unambiguous.
-4. Set `GOREST_TEST_MYSQL_CONFIRM_DATABASE` to exactly the configured test database name. This is a required explicit opt-in before test data can be written.
-5. Ensure the test account can insert, read, and delete only the intended test data.
+1. Provision a dedicated non-production ScyllaDB keyspace. It must already exist before the test connects; a name ending in `_test` or `_testing` is recommended.
+2. Set `GOREST_TEST_SCYLLA_HOST`, `PORT`, `KEYSPACE`, and, when needed, `USER` and `PASSWORD` in `.env` or the process environment. The optional TLS settings are `GOREST_TEST_SCYLLA_TLS`, `CA_FILE`, `CERT_FILE`, and `KEY_FILE`; use `enable` for verified TLS and configure the client certificate and key together.
+3. Set `GOREST_TEST_SCYLLA_CONFIRM_KEYSPACE` to exactly match the configured test keyspace. For a keyspace without the `_test` or `_testing` suffix, also set `GOREST_TEST_SCYLLA_ALLOW_NON_TEST_KEYSPACE` to that exact name.
+4. Ensure the test account can connect, create the users table and email index, use GOREST migration lock tables/lightweight transactions, and perform the test's insert/read/delete operations. Verify the needed permissions with your ScyllaDB administrator.
 
-The HTTP test uses `GOREST_TEST_MYSQL_HOST`, `PORT`, `DATABASE`, `USER`, `PASSWORD`, and `TLS`, documented in `.env.example`. It also accepts optional `GOREST_TEST_MYSQL_CA_FILE`, `CERT_FILE`, and `KEY_FILE` paths for a private server CA and mTLS. The client certificate and key must be configured together. If those test-specific paths are blank, the test inherits the matching `GOREST_DB_*` CA/certificate settings when using the application database as its test endpoint. The test runner maps the validated connection settings to the preflight connection and app child process. The harness closes idle preflight/application database connections so E2E can run under accounts with constrained connection limits. Do not set these variables to production credentials or a production database. The test inserts a UUID-scoped user and cleanup deletes only that exact ID/email record. It does not truncate or drop tables.
+If the dedicated test host/keyspace/credentials are not configured, the test harness can use `GOREST_DB_*` only when `GOREST_APP_ENV` is `development`, `test`, or `testing`, `GOREST_DB_DRIVER=scylla`, and `GOREST_DB_DISABLE=false`. Exact keyspace confirmation is still required. Test-specific TLS paths override application paths. The test runner maps the validated settings into the migration and HTTP child process; do not set them to production credentials or a production keyspace.
 
-Database names normally must end in `_test` or `_testing`. If a dedicated non-production test database uses another name, an additional explicit opt-in is required: set `GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE` to exactly the same database name as the confirmation variable. Never use this override for production.
+The library and HTTP tests run the up migration and seeder. They do not drop the keyspace or tables and leave migration/seeder metadata and ten sample rows in the test keyspace. Each test uses a unique user ID and deletes only its own records. Use a disposable keyspace or review the retained artifacts after testing.
 
-Run the integration suite separately:
+Run the selected ScyllaDB integration tests:
 
 ```sh
 make test-integration
-# equivalent:
-go test -tags=integration -v -count=1 -timeout=5m ./integration-test
+# run the full tagged suite, including optional Redis checks:
+make integration-reports
 ```
 
-The Go build tag keeps external-database tests out of `go test ./...`. If required test settings or the safety confirmation are missing, the integration run fails before starting the application or modifying test data.
-
-For a dedicated non-production test database whose name does not end in `_test` or `_testing`, explicitly confirm the exact name in both variables:
-
-```sh
-GOREST_TEST_MYSQL_CONFIRM_DATABASE='your-test-database' \
-GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE='your-test-database' \
-make test-integration
-```
-
-If the host resolves to an unreachable IPv6 address in your environment, run with `GODEBUG=netdns=cgo` to use the system resolver.
+The Go `integration` build tag excludes database-dependent tests from `go test ./...`. `make test-integration` fails if the ScyllaDB configuration or exact keyspace confirmation is missing. The mTLS check is skipped when client-certificate settings are absent and fails on partial configuration. The full tagged suite may connect to Redis if Redis is enabled in the environment; leave Redis disabled to avoid those optional checks.
 
 ## GitHub Actions CI
 
-`.github/workflows/test.yml` runs unit tests and generates coverage on pushes, pull requests, and manual dispatches. It uploads `coverage/unit.coverprofile` to Codecov and retains the unit coverage reports as a workflow artifact. The Codecov upload is informational and does not fail CI if upload fails.
+The test workflow runs unit tests and isolated ScyllaDB integration-configuration checks. It does not connect to ScyllaDB or Redis. External database tests are run locally or in a separately managed environment with explicit test-keyspace confirmation. A passing CI workflow does not claim that external persistence, TLS, or HTTP E2E tests passed.
 
-To run the HTTP integration job in GitHub Actions, configure these repository Actions secrets: `GOREST_TEST_MYSQL_HOST`, `GOREST_TEST_MYSQL_DATABASE`, `GOREST_TEST_MYSQL_USER`, `GOREST_TEST_MYSQL_PASSWORD`, and `GOREST_TEST_MYSQL_CONFIRM_DATABASE`. The confirmation must exactly match the test database name. Database names must end in `_test` or `_testing`, unless `GOREST_TEST_MYSQL_ALLOW_NON_TEST_DATABASE` is also configured with the exact same name. Set the optional `GOREST_TEST_MYSQL_TLS` secret to `true` when the server requires TLS; a CA path is not required when the server certificate chains to a runner system root. For a private CA, store the PEM CA certificate contents in the optional `GOREST_TEST_MYSQL_CA_PEM` secret. The workflow adds it to the runner's system trust bundle before running the tests.
-
-To also run the mTLS connection test in CI, configure all of the optional `GOREST_TEST_MYSQL_MTLS_HOST`, `PORT`, `DATABASE`, `USER`, `PASSWORD`, `CA_PEM`, `CLIENT_CERT_PEM`, and `CLIENT_KEY_PEM` secrets. The workflow writes certificate/key contents to restricted-permission temporary files and maps their paths for the test. The dedicated MySQL account must require client certificates (`REQUIRE X509`); mTLS test secrets are independent of the HTTP E2E database settings.
-
-To run the Redis integration test in CI, configure the optional `GOREST_TEST_REDIS_HOST`, `PORT`, `DATABASE`, `USER`, `PASSWORD`, and `TLS` secrets. `GOREST_TEST_REDIS_CA_PEM` can provide a private CA; `GOREST_TEST_REDIS_CLIENT_CERT_PEM` and `GOREST_TEST_REDIS_CLIENT_KEY_PEM` are optional and must be configured together. Use a dedicated Redis test instance/database and a limited ACL account.
-
-To run the Redis mTLS check in CI, configure the optional `GOREST_TEST_REDIS_MTLS_HOST`, `DATABASE`, `CA_PEM`, `CLIENT_CERT_PEM`, and `CLIENT_KEY_PEM` secrets; `PORT` defaults to `6379`, and `USER` / `PASSWORD` are needed only when Redis authentication is enabled. This must be an endpoint configured to require client certificates. The workflow writes the CA and client key pair to restricted-permission temporary files. See [Redis TLS and mTLS configuration](./configuration.md#use-a-private-ca-or-mutual-tls) for client-side setup and certificate roles.
-
-Before enabling the job, provision a dedicated non-production database, verify that GitHub-hosted runners can reach it, and grant the test account permission to create the `users` table and migration metadata. The integration test applies the up migration automatically; it does not drop tables or seed data. Store credentials and the PEM CA contents as GitHub Actions secrets rather than workflow literals; see GitHub's [using secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) guide. GOREST v1.1.21 supports TLS with system roots or a configured CA and can present a configured client certificate for mTLS; see [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates).
-
-If the required secrets are unavailable, GitHub skips the E2E job; it does not substitute a local or production database. A skipped job means E2E was not run and is not evidence that the HTTP flow passed. This commonly applies to pull requests from forks, for which GitHub does not expose repository secrets to the workflow. See GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request) documentation for the `pull_request` event's secret-access behavior. Configure repository Actions secrets for a dedicated non-production database according to your project's access policy; do not weaken the workflow's database safety checks to make secrets available.
-
-The Codecov token is read from the optional `CODECOV_TOKEN` repository secret. CI uploads the unit profile from `make coverage` and, when the external database is configured and the integration job succeeds, the application profile from `make integration-reports`. If mTLS or Redis settings are configured, those optional tests run as part of the same suite; without their settings, they are explicitly skipped.
+The release-check workflow runs formatting, `go vet`, unit tests, linting, secret scanning, and a build. See [Release checks](./release-checks.md).
 
 ## HTTP scenarios
 
-`TestMySQLUserEndpointsOverHTTP` checks:
+`TestScyllaUserEndpointsOverHTTP` checks application startup against ScyllaDB and verifies:
 
-- The running application becomes ready.
-- Malformed JSON for `POST /users/create` returns an error response.
-- Missing required user fields and duplicate user creation are rejected.
-- A valid create request returns success, inserts a MySQL row, and stores a hash instead of the submitted password.
-- Incorrect login credentials return HTTP `401`; a valid login returns HTTP `200` and an `access` cookie.
+- Malformed JSON and missing required user fields are rejected.
+- Duplicate user creation is rejected.
+- A valid create request stores a password hash rather than the submitted password.
+- Incorrect login credentials return HTTP `401`; valid credentials return HTTP `200` and an access cookie.
 - `GET /users/` without authentication returns HTTP `401`.
 - `GET /users/` with the access cookie returns the created user without a password field.
-- Test data is removed by a targeted ID/email cleanup.
+- Cleanup deletes only the unique ID/email record created by the test.
 
-The test uses a random user ID/email on each run so repeated and concurrent runs do not collide. The suite does not mutate schema and requires the `users` table to be provisioned before execution.
+## Optional TLS and Redis checks
 
-## MySQL mutual-TLS integration test
+`TestScyllaMutualTLSRequiresClientCertificate` is an opt-in connection test using the ScyllaDB test TLS settings; configure an endpoint that requires client certificates. Keep private keys out of Git and do not point the test at production.
 
-`TestMySQLMutualTLSRequiresClientCertificate` is an opt-in, read-only connection test using GOREST v1.1.21's native MySQL TLS paths. It is separate from the HTTP E2E test. To run it, configure all of the following in `.env` or the environment:
-
-- `GOREST_TEST_MYSQL_MTLS_HOST`, optional `GOREST_TEST_MYSQL_MTLS_PORT` (defaults to `3306`), and `GOREST_TEST_MYSQL_MTLS_DATABASE`.
-- `GOREST_TEST_MYSQL_MTLS_USER` and `GOREST_TEST_MYSQL_MTLS_PASSWORD` for a dedicated MySQL account that has `REQUIRE X509`.
-- `GOREST_TEST_MYSQL_MTLS_TLS=true`.
-- `GOREST_TEST_MYSQL_MTLS_CA_FILE`, `GOREST_TEST_MYSQL_MTLS_CLIENT_CERT_FILE`, and `GOREST_TEST_MYSQL_MTLS_CLIENT_KEY_FILE`, pointing to readable PEM files.
-
-Alternatively, in a development/test environment, the test can reuse `GOREST_DB_HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `TLS`, `CA_PATH`, `CERT_PATH`, and `KEY_PATH`. Explicit `GOREST_TEST_MYSQL_MTLS_*` values take precedence. Run the test with `go test -tags=integration -run '^TestMySQLMutualTLSRequiresClientCertificate$' -count=1 ./integration-test`. The server must reject the account without a client certificate (error 1045) and accept it with the configured certificate; the test also checks that the accepted session has a non-empty `Ssl_cipher`. If no mTLS configuration is present, the test is skipped; partial configuration is an error. Keep private keys out of Git and never point the test at production.
-
-## Redis integration test
-
-`TestGORESTRedisServiceAgainstConfiguredInstance` uses the Redis connection settings from the process environment or `.env`. Set `GOREST_REDIS_DISABLE=false` only when those settings point to a dedicated non-production Redis instance. The test refuses `GOREST_APP_ENV=production`, checks connectivity, and reads, writes, and deletes only a UUID-scoped key. It does not flush Redis or modify existing keys. Use an account with permission for the selected test database and key operations.
-
-For TLS server authentication, set `GOREST_REDIS_TLS=true`. A Redis certificate signed by a system-trusted CA does not require `GOREST_REDIS_CA_PATH`; use that setting for a private CA. The optional `TestGORESTRedisMutualTLSRequiresClientCertificate` checks a Redis endpoint configured to require client certificates: the endpoint must reject the connection without a client identity and accept it with the configured certificate/key. Configure a CA file and both client certificate files using either `GOREST_TEST_REDIS_MTLS_*` for a separate endpoint, or `GOREST_REDIS_CA_PATH`, `GOREST_REDIS_CERT_PATH`, and `GOREST_REDIS_KEY_PATH` with `GOREST_REDIS_TLS=true` for the runtime endpoint. The test skips when no client certificate is configured and rejects a partial certificate/key pair. Do not use production credentials or services.
+The Redis integration tests are independent of the current user routes. They run only when the corresponding Redis service settings are enabled/configured. They use unique test keys and do not flush Redis; the Redis mTLS test requires an endpoint configured to require client certificates. Keep optional Redis settings disabled unless they point to dedicated non-production test infrastructure.
 
 ## Coverage and reports
 
-Generate the unit coverage profile, function summary, and HTML report:
+Generate the unit profile, function summary, and HTML report:
 
 ```sh
 make coverage
 ```
 
-Generated files:
-
-- `coverage/unit.coverprofile` — Go coverage profile for machine processing.
-- `coverage/unit-coverage.txt` — human-readable per-function and total summary from `go tool cover -func`.
-- `coverage/unit-coverage.html` — source-annotated HTML report from `go tool cover -html`.
-
-The unit coverage command instruments `./app/...` and runs the package unit tests. Generate E2E reports and application integration coverage together after configuring the external test database:
+To run the full tagged integration suite once and produce both readable/JSON test reports and application coverage:
 
 ```sh
 make integration-reports
 ```
 
-This runs the integration suite once. It instruments the application child process, waits for its graceful shutdown to flush coverage, and generates:
+Outputs are generated under `coverage/` and ignored by Git:
 
-- `coverage/integration-test.txt` — readable Go test output.
-- `coverage/integration-test.json` — machine-readable Go test events.
-- `coverage/integration.coverprofile` — coverage profile for the application entry point and `./app/...` exercised by E2E.
-- `coverage/integration-coverage.txt` and `coverage/integration-coverage.html` — function summary and source-annotated report.
+- `unit.coverprofile`, `unit-coverage.txt`, and `unit-coverage.html`
+- `integration-test.txt` and `integration-test.json`
+- `integration.coverprofile`, `integration-coverage.txt`, and `integration-coverage.html`
 
-`make integration-report` and `make integration-json` remain aliases for the same combined target. Reports under `coverage/` are generated artifacts and are ignored by Git; regenerate them for each source revision and test environment whose results you want to retain. For reproducible test evidence, keep the source commit, Go version, MySQL server version, test command, sanitized configuration (no credentials), and report filenames with the reports. A coverage percentage alone does not demonstrate that the application has been tested sufficiently. See the Go team's [Code coverage for Go integration tests](https://go.dev/doc/build-cover) guide.
+Keep generated evidence with the source commit, Go version, ScyllaDB server version, test command, and sanitized environment description. A coverage percentage alone does not demonstrate that the application has been tested sufficiently. See the Go team's [Code coverage for Go integration tests](https://go.dev/doc/build-cover) guide.
 
 ## Reading the evidence
 
-- A passing unit suite means the isolated package tests passed on the current source.
-- A passing E2E suite means the listed HTTP workflow passed against the MySQL server configured for that run.
-- The unit profile and integration profile are generated by separate test runs and cover different execution paths.
-- A test run is evidence for TLS/mTLS only when the configured MySQL connector verifies the required server certificate and, for mTLS, presents an accepted client certificate. Follow [MySQL TLS configuration](./database.md#configure-tls-private-cas-and-client-certificates) and verify both accepted and rejected connection cases.
-- Keep each report with its source revision and environment details so another team member can understand and reproduce the test run.
+- Passing unit tests means isolated package tests passed on the current source.
+- Passing ScyllaDB integration tests means the covered flows passed against the configured keyspace for that run.
+- A test run is evidence for TLS/mTLS only when the endpoint uses the expected server certificate and client-certificate policy.
+- Unit and integration profiles cover different execution paths; retain both with their source revision and environment details.

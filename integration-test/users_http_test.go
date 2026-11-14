@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -28,41 +27,37 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
-	testConfig, err := loadMySQLTestConfig()
+func TestScyllaUserEndpointsOverHTTP(t *testing.T) {
+	testConfig, err := loadScyllaTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepareMySQLIntegrationSchema(t, testConfig)
+	prepareScyllaIntegrationSchema(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
 		t.Fatalf("load test database configuration: %v", err)
 	}
-	if dbConfig.Driver != database.MYSQL || dbConfig.Name != testConfig.database {
-		t.Fatalf("database configuration is not the selected MySQL test database")
+	if dbConfig.Driver != database.SCYLLA || dbConfig.Name != testConfig.keyspace {
+		t.Fatal("database configuration is not the selected ScyllaDB test keyspace")
 	}
 	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 15*time.Second)
 	testDB, message, err := database.New(databaseContext, dbConfig, gorest.DefaultTimezone)
 	cancelDatabase()
 	if err != nil {
-		t.Fatalf("connect to configured MySQL test database (%s): %v", message, err)
+		t.Fatalf("connect to configured ScyllaDB test keyspace (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
-		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close MySQL test database connection: %v", err)
-		}
+		closeScyllaDatabase(t, testDB, dbConfig)
 	})
-	requireUsersTable(t, testDB.SQL)
-	// Release the preflight connection before the application uses the test account.
-	testDB.SQL.SetMaxIdleConns(0)
+	requireUsersTable(t, testDB, dbConfig)
 
 	testID := uuid.NewString()
 	testEmail := "integration+" + strings.ReplaceAll(testID, "-", "") + "@example.test"
 	testPassword := "integration-test-password"
-	cleanupUser(t, testDB.SQL, testID, testEmail)
+	cleanupScyllaUser(t, testDB, dbConfig, testID)
 	t.Cleanup(func() {
-		cleanupUser(t, testDB.SQL, testID, testEmail)
+		cleanupScyllaUser(t, testDB, dbConfig, testID)
 	})
 
 	signatureKeyBytes := make([]byte, 48)
@@ -94,20 +89,20 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 		testEmail,
 		testPassword,
 	)
-	t.Run("creates a MySQL user", func(t *testing.T) {
+	t.Run("creates a ScyllaDB user", func(t *testing.T) {
 		response := requestJSON(t, client, http.MethodPost, baseURL+"/users/create", createRequest, "")
 		if response.status != http.StatusOK || response.json["success"] != true {
 			t.Fatalf("create response = (%d, %s), want HTTP 200 success", response.status, response.body)
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 		var storedID, storedEmail, storedPassword string
 		var active bool
-		err := testDB.SQL.QueryRow(
-			"SELECT id, email, password, is_active FROM users WHERE id = ?",
-			testID,
-		).Scan(&storedID, &storedEmail, &storedPassword, &active)
+		err := testDB.Scylla.Query("SELECT id, email, password, is_active FROM users WHERE id = ?", testID).
+			WithContext(ctx).Scan(&storedID, &storedEmail, &storedPassword, &active)
 		if err != nil {
-			t.Fatalf("read created user from MySQL: %v", err)
+			t.Fatalf("read created user from ScyllaDB: %v", err)
 		}
 		if storedID != testID || storedEmail != testEmail || !active || storedPassword == testPassword {
 			t.Fatalf("persisted user = (%q, %q, %t, password-set:%t), want created user with hashed password",
@@ -121,12 +116,15 @@ func TestMySQLUserEndpointsOverHTTP(t *testing.T) {
 			t.Fatalf("duplicate create response = (%d, %s), want a client/server error", response.status, response.body)
 		}
 
-		var count int
-		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM users WHERE id = ?", testID).Scan(&count); err != nil {
-			t.Fatalf("count duplicate test user rows: %v", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		var count int64
+		if err := testDB.Scylla.Query("SELECT COUNT(*) FROM users WHERE id = ?", testID).
+			WithContext(ctx).Scan(&count); err != nil {
+			t.Fatalf("count duplicate ScyllaDB test rows: %v", err)
 		}
 		if count != 1 {
-			t.Fatalf("duplicate create left %d records for test ID, want exactly one", count)
+			t.Fatalf("duplicate create left %d rows for test ID, want exactly one", count)
 		}
 	})
 
@@ -218,56 +216,22 @@ func requestJSON(t *testing.T, client *http.Client, method, url, body, cookie st
 	}
 }
 
-func requireUsersTable(t *testing.T, db interface {
-	QueryRow(query string, args ...any) *sql.Row
-}) {
+func requireUsersTable(t *testing.T, db *database.Database, cfg *database.Config) {
 	t.Helper()
-
-	var tableCount int
-	if err := db.QueryRow(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
-	).Scan(&tableCount); err != nil {
-		t.Fatalf("check the MySQL users table: %v", err)
-	}
-	if tableCount != 1 {
-		t.Fatal("MySQL test database does not contain the users table; apply the MySQL migration before running integration tests")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var tableName string
+	err := db.Scylla.Query(
+		"SELECT table_name FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
+		cfg.Name, "users",
+	).WithContext(ctx).Scan(&tableName)
+	if err != nil || tableName != "users" {
+		t.Fatalf("ScyllaDB test keyspace does not contain the users table; apply the migration first (table=%q, error=%v)",
+			tableName, err)
 	}
 }
 
-func cleanupUser(t *testing.T, db interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}, id, email string) {
-	t.Helper()
-
-	if _, err := db.Exec("DELETE FROM users WHERE id = ? AND email = ?", id, email); err != nil {
-		t.Errorf("clean up integration user %s: %v", id, err)
-	}
-}
-
-func applyMySQLTestConfig(t *testing.T, config mysqlTestConfig) {
-	t.Helper()
-	for key, value := range map[string]string{
-		"GOREST_APP_ENV":                      "testing",
-		"GOREST_DB_DISABLE":                   "false",
-		"GOREST_DB_DRIVER":                    "mysql",
-		"GOREST_DB_HOST":                      config.host,
-		"GOREST_DB_PORT":                      config.port,
-		"GOREST_DB_NAME":                      config.database,
-		"GOREST_DB_USER":                      config.username,
-		"GOREST_DB_PASSWORD":                  config.password,
-		"GOREST_DB_TLS":                       config.tls,
-		"GOREST_DB_CA_PATH":                   config.caPath,
-		"GOREST_DB_CERT_PATH":                 config.certPath,
-		"GOREST_DB_KEY_PATH":                  config.keyPath,
-		"GOREST_DB_MIGRATION":                 "false",
-		"GOREST_DB_SEEDER":                    "false",
-		"GOREST_DB_ALLOW_INSECURE_PRODUCTION": "false",
-	} {
-		t.Setenv(key, value)
-	}
-}
-
-func startApplication(t *testing.T, config mysqlTestConfig, signatureKey string) (string, func()) {
+func startApplication(t *testing.T, config scyllaTestConfig, signatureKey string) (string, func()) {
 	t.Helper()
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")

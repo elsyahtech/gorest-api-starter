@@ -9,7 +9,7 @@ import (
 	goresthelper "github.com/elsyahtech/gorest/helper"
 )
 
-// DatabaseConfig loads the MySQL connection settings and optional startup tasks.
+// DatabaseConfig loads the ScyllaDB connection settings and optional startup tasks.
 func DatabaseConfig() (*database.Config, error) {
 	cfg := database.ConfigDefault
 
@@ -23,44 +23,47 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_DISABLE: %w", err)
 	}
 
-	// This starter supports MySQL only.
 	cfg.Driver = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_DRIVER",
-		database.MYSQL,
+		database.SCYLLA,
 	)
-	if !strings.EqualFold(cfg.Driver, database.MYSQL) {
-		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the MySQL starter", database.MYSQL)
+	if !strings.EqualFold(cfg.Driver, database.SCYLLA) {
+		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the ScyllaDB starter", database.SCYLLA)
 	}
 
-	cfg.Driver = database.MYSQL
+	cfg.Driver = database.SCYLLA
 
-	cfg.Host = goresthelper.ReadEnvironmentStringWithDefault(
+	cfg.Host = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_HOST",
 		database.DefaultDatabaseHost,
-	)
-	cfg.Port = goresthelper.ReadEnvironmentStringWithDefault(
+	))
+
+	cfg.Port = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_PORT",
-		database.MYSQL_PORT,
-	)
-	cfg.Name = goresthelper.ReadEnvironmentStringWithDefault(
+		database.SCYLLA_PORT,
+	))
+
+	cfg.Name = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_NAME",
-		database.DefaultDatabaseName,
-	)
+		"",
+	))
+
+	if cfg.Name == "" {
+		return &database.Config{}, errors.New("GOREST_DB_NAME (ScyllaDB keyspace) cannot be empty")
+	}
 
 	cfg.Username = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_USER",
 		"",
 	))
-	if cfg.Username == "" {
-		return &database.Config{}, errors.New("DB Username cannot be empty")
-	}
 
 	cfg.Password = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_PASSWORD",
 		"",
 	))
-	if cfg.Password == "" {
-		return &database.Config{}, errors.New("DB Password cannot be empty")
+
+	if (cfg.Username == "") != (cfg.Password == "") {
+		return &database.Config{}, errors.New("GOREST_DB_USER and GOREST_DB_PASSWORD must be configured together")
 	}
 
 	cfg.AllowInsecureProduction, err = goresthelper.ReadEnvironmentBooleanWithDefault(
@@ -71,64 +74,44 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_ALLOW_INSECURE_PRODUCTION: %w", err)
 	}
 
-	timeout, err := goresthelper.ReadEnvironmentDurationWithDefault(
+	cfg.TLS = strings.ToLower(strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_TLS",
+		database.TLSDisabled,
+	)))
+
+	if cfg.TLS != database.TLSDisabled && cfg.TLS != database.TLSEnabled {
+		return &database.Config{}, errors.New("GOREST_DB_TLS must be enable or disable for ScyllaDB")
+	}
+
+	cfg.SSLCertPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_CERT_PATH",
+		"",
+	))
+
+	cfg.SSLCAPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_CA_PATH",
+		"",
+	))
+
+	cfg.SSLKeyPath = strings.TrimSpace(goresthelper.ReadEnvironmentStringWithDefault(
+		"GOREST_DB_KEY_PATH",
+		"",
+	))
+
+	if (cfg.SSLCertPath == "") != (cfg.SSLKeyPath == "") {
+		return &database.Config{}, errors.New("GOREST_DB_CERT_PATH and GOREST_DB_KEY_PATH must be configured together")
+	}
+
+	if (cfg.SSLCAPath != "" || cfg.SSLCertPath != "") && cfg.TLS != database.TLSEnabled {
+		return &database.Config{}, errors.New("GOREST_DB_TLS=enable is required when ScyllaDB TLS files are configured")
+	}
+
+	cfg.Timeout, err = goresthelper.ReadEnvironmentDurationWithDefault(
 		"GOREST_DB_TIMEOUT",
 		database.DefaultTimeout,
 	)
 	if err != nil {
-		return &database.Config{}, fmt.Errorf("%w", err)
-	}
-
-	connectionMaxLifetime, err := goresthelper.ReadEnvironmentDurationWithDefault(
-		"GOREST_DB_CONNECTION_MAX_LIFETIME",
-		database.DefaultConnectionMaxLifetime,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("%w", err)
-	}
-
-	cfg.TLS = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_TLS",
-		database.TLSDisabled,
-	)
-
-	cfg.SSLCertPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CERT_PATH",
-		"",
-	)
-
-	cfg.SSLCAPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CA_PATH",
-		"",
-	)
-
-	cfg.SSLKeyPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_KEY_PATH",
-		"",
-	)
-
-	cfg.Charset = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CHARSET",
-		database.DefaultCharset,
-	)
-
-	cfg.Timeout = timeout
-	cfg.ConnectionMaxLifetime = connectionMaxLifetime
-
-	cfg.MaxOpenConnections, err = goresthelper.ReadEnvironmentIntegerWithDefault(
-		"GOREST_DB_MAX_OPEN_CONNECTIONS",
-		database.DefaultMaxOpenConnections,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MAX_OPEN_CONNECTIONS: %w", err)
-	}
-
-	cfg.MaxIdleConnections, err = goresthelper.ReadEnvironmentIntegerWithDefault(
-		"GOREST_DB_MAX_IDLE_CONNECTIONS",
-		database.DefaultMaxIdleConnections,
-	)
-	if err != nil {
-		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_MAX_IDLE_CONNECTIONS: %w", err)
+		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_TIMEOUT: %w", err)
 	}
 
 	cfg.QueryLogging, err = goresthelper.ReadEnvironmentBooleanWithDefault(

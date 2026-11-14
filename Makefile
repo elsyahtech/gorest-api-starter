@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: run test unit-test test-integration test-hardening-integration integration-report integration-json integration-reports coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
+.PHONY: run test unit-test test-integration test-scylla-connection test-hardening-integration integration-report integration-json integration-reports coverage vet format-check lint lint-full tool-versions secret-scan release-check check clean build ci upgrade fieldalignment rebuild push
 
 run:
 	go run .
@@ -11,7 +11,11 @@ unit-test:
 	go test -v ./... -count=1
 
 test-integration:
-	go test -tags=integration -v -count=1 -timeout=5m ./integration-test
+	go test -tags=integration -v -count=1 -timeout=5m ./integration-test \
+		-run '^(TestLoadScyllaTestConfig.*|TestResolveScyllaTestPath.*|TestScyllaDatabaseConnection|TestScyllaMutualTLSRequiresClientCertificate|TestScyllaUserLibraryAgainstDatabase|TestScyllaUserEndpointsOverHTTP)$$'
+
+test-scylla-connection:
+	go test -tags=integration -v -count=1 -timeout=2m ./integration-test -run '^TestScyllaDatabaseConnection$$'
 
 test-hardening-integration:
 	go test -tags=integration -run '^TestHardeningEndpointIntegration$$' -v -count=1 ./integration-test

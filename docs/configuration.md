@@ -8,9 +8,9 @@ The sample uses GOREST v1.1.21. Application settings use `GOREST_APP_*`; the HTT
 
 Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md).
 
-## MySQL
+## ScyllaDB
 
-MySQL connection variables are documented in the [MySQL configuration guide](./database.md). GOREST v1.1.21 supports verified server TLS, custom CA files, and client certificates for mTLS through the database configuration. Follow the guide to set the required CA and client key pair.
+ScyllaDB connection variables, keyspace setup, migration permissions, and TLS/mTLS are documented in the [ScyllaDB configuration guide](./database.md). The keyspace must exist before the application starts; configure both client certificate and key for mTLS.
 
 ## Redis (optional)
 
