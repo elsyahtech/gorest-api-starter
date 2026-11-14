@@ -8,9 +8,9 @@ The sample uses GOREST v1.1.21. Application settings use `GOREST_APP_*`; the HTT
 
 Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md).
 
-## SQL Server
+## SQLite
 
-SQL Server connection variables are documented in the [SQL Server configuration guide](./database.md). The starter defaults to `GOREST_DB_TLS=mandatory` and `GOREST_DB_TRUST_SERVER_CERTIFICATE=false`, which encrypts connections and validates the server certificate. The certificate chain must be trusted by the host operating system or supplied through `GOREST_DB_CA_PATH`, and the configured host must match its subject alternative names. Do not enable `GOREST_DB_TRUST_SERVER_CERTIFICATE` in production.
+Database settings are documented in the [SQLite configuration guide](./database.md). The starter accepts only `GOREST_DB_DRIVER=sqlite` and stores its database in a local file; it does not use network database credentials.
 
 ## Redis (optional)
 

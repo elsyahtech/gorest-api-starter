@@ -1,10 +1,8 @@
-# Testing your SQL Server starter
+# Testing your SQLite starter
 
-The starter provides fast unit tests and optional integration tests against a SQL Server instance you control. Unit tests do not connect to a database. Integration tests exercise the real database connection with verified TLS, library operations, startup migration/seeding, and HTTP endpoints.
+The starter provides fast unit tests and SQLite integration tests. Unit tests do not connect to a database. Integration tests exercise actual SQLite persistence, migrations, seeders, library operations, and HTTP endpoints using temporary database files.
 
 ## Run unit tests
-
-Unit tests check isolated configuration, validation, routing, and response-mapping behavior:
 
 ```sh
 make unit-test
@@ -12,28 +10,19 @@ make unit-test
 go test ./... -count=1
 ```
 
-They need no database credentials or external services. They do not prove that SQL Server connectivity, SQL statements, migrations, or TLS settings work against your instance.
+Unit tests need no database credentials or external services. They do not prove the integration behavior covered by the tagged tests.
 
-The hardening-report HTTP integration test is separate from the SQL Server suite and does not connect to a database. It starts a local GOREST process to verify the endpoint's default-off behavior, peer-IP allowlisting, forwarded-header handling, report redaction, response headers, and format validation.
+The hardening-report HTTP integration test is separate from the SQLite suite and does not connect to a database. It starts a local GOREST process to verify the endpoint's default-off behavior, peer-IP allowlisting, forwarded-header handling, report redaction, response headers, and format validation.
 
-## Prepare a SQL Server integration database
-
-Integration tests use `GOREST_DB_*` connection settings from the process environment or `.env`. Before running them:
-
-1. Use a dedicated, non-production SQL Server database and a restricted login. The HTTP flow runs the configured migration and seeder, so the login needs permissions for those operations and the tested user operations.
-2. Set `GOREST_DB_DRIVER=sqlserver`, `GOREST_DB_DISABLE=false`, and the host, port, database name, username, and password. The default port is `1433`.
-3. Configure `GOREST_DB_TLS=mandatory` or `strict`. Keep `GOREST_DB_TRUST_SERVER_CERTIFICATE=false`; the server certificate must chain to a root trusted by the host and its name must match `GOREST_DB_HOST`. For a private CA, set `GOREST_DB_CA_PATH` to its PEM trust bundle.
-4. Set `GOREST_TEST_SQLSERVER_CONFIRM_DATABASE` to exactly match `GOREST_DB_NAME`. This explicit confirmation is required even if the name looks like a test database. The test runner refuses SQL Server system databases and production mode.
-
-The SQL Server integration tests perform schema changes and write test data. Do not point them at production or any database containing data that must be preserved.
-
-## Run integration tests
-
-Run SQL Server TLS, database library, migration/seeder, and HTTP integration tests:
+## Run SQLite integration tests
 
 ```sh
 make test-integration
 ```
+
+Each test creates an isolated SQLite database in a temporary directory. Migrations and seeders come from `app/database/migrations/sqlite` and `app/database/seeders/sqlite`; the normal `app/database/gorest.db` is not used. No database server, credentials, Docker, or `.env` database settings are needed.
+
+The suite checks that the SQLite test configuration resolves to the repository migration/seeder assets, verifies user creation and password hashing through the library, and tests HTTP creation, duplicate rejection, login, and authenticated listing. Temporary files are cleaned up by Go's testing framework.
 
 Run the local hardening HTTP integration test independently:
 
@@ -41,35 +30,15 @@ Run the local hardening HTTP integration test independently:
 make test-hardening-integration
 ```
 
-The SQL Server TLS test connects using mandatory or strict encryption and server-certificate validation. The library test checks user creation, password hashing, listing, and rejection of an incorrect password. The HTTP flow starts the application with migrations and seed data enabled, then checks user creation, duplicate rejection, login, and authenticated listing. Test-created users are uniquely identified and removed afterward; the suite does not truncate tables or drop the database.
-
-To run only the SQL Server TLS connection check:
-
-```sh
-make test-sqlserver-tls
-```
-
-The `integration` build tag keeps external-service checks out of the default unit-test command. The target above selects SQL Server checks only; it does not run optional Redis tests.
+The `integration` build tag keeps integration checks out of the default unit-test command.
 
 ## Optional Redis checks
 
-Redis is not required by the user API and is disabled by default. If you have enabled Redis for your application, the full tagged suite can also test it when you run:
-
-```sh
-make integration-reports
-```
-
-That command runs the tagged integration suite once and creates coverage and test-output files under `coverage/`. Redis tests use the configured Redis endpoint when enabled, so point it only at a dedicated non-production instance. They use a unique key and do not flush the database. Redis mTLS checks require an endpoint configured to require client certificates. See [Redis configuration](./configuration.md#redis-optional) before enabling Redis.
+Redis is not required by the user API and is disabled by default. `make integration-reports` runs the full tagged suite and creates coverage and test-output files under `coverage/`. The Redis integration checks are skipped unless Redis is explicitly enabled/configured; if enabled, they connect to the configured endpoint, so use a dedicated non-production instance. They use unique test keys and do not flush the database. Redis mTLS checks require an endpoint configured to require client certificates. See [Redis configuration](./configuration.md#redis-optional) before enabling Redis.
 
 ## Automated checks in GitHub Actions
 
-The workflow runs unit tests and coverage on pushes and pull requests. Its SQL Server integration job runs only when secrets are configured for a reachable, dedicated non-production SQL Server database:
-
-- `GOREST_TEST_SQLSERVER_HOST`, optional `GOREST_TEST_SQLSERVER_PORT` (defaults to `1433`), `GOREST_TEST_SQLSERVER_DATABASE`, `GOREST_TEST_SQLSERVER_USER`, and `GOREST_TEST_SQLSERVER_PASSWORD`.
-- `GOREST_TEST_SQLSERVER_TLS`, set to `mandatory` or `strict`.
-- `GOREST_TEST_SQLSERVER_CONFIRM_DATABASE`, exactly matching the database name.
-
-The server certificate must validate against the GitHub runner's trusted roots and its hostname must match the configured host. The workflow does not install a private CA bundle; use a certificate trusted by the runner for CI integration tests. If the required secrets are unavailable, GitHub skips the integration job; a skipped job is not a passing test result. Credentials belong in Actions secrets or a secret manager, never in the workflow file.
+GitHub Actions runs unit tests and SQLite integration tests on pushes and pull requests. The integration workflow uses temporary local database files and requires no external database secrets. Optional Redis checks remain disabled unless explicitly configured.
 
 ## Coverage
 
@@ -85,4 +54,4 @@ Generate integration test output and application coverage with:
 make integration-reports
 ```
 
-These reports help you see which code paths your tests exercised; they do not replace reviewing the behavior and test cases relevant to your application. Regenerate them after source changes if you use them to evaluate coverage.
+Reports are written under `coverage/`. They help show which code paths tests exercised; they do not replace reviewing the behavior and test cases relevant to your application.

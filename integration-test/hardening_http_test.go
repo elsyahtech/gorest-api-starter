@@ -47,7 +47,7 @@ func TestHardeningEndpointIntegration(t *testing.T) {
 	})
 
 	t.Run("allowlisted peer receives redacted no-store reports", func(t *testing.T) {
-		const signatureKey = "sqlserver-starter-hardening-test-signing-key"
+		const signatureKey = "sqlite-starter-hardening-test-signing-key"
 		baseURL := startHardeningApplication(t, map[string]string{
 			"GOREST_HARDENING_ENABLE":      "true",
 			"GOREST_HARDENING_ALLOWED_IPS": "127.0.0.1/32",

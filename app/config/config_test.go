@@ -113,22 +113,12 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_SERVER_CORS_DISABLE_VALUE_REDACTION",
 	"GOREST_DB_DISABLE",
 	"GOREST_DB_DRIVER",
-	"GOREST_DB_HOST",
-	"GOREST_DB_PORT",
 	"GOREST_DB_NAME",
-	"GOREST_DB_USER",
-	"GOREST_DB_PASSWORD",
-	"GOREST_DB_TLS",
-	"GOREST_DB_ALLOW_INSECURE_PRODUCTION",
-	"GOREST_DB_CA_PATH",
-	"GOREST_DB_TRUST_SERVER_CERTIFICATE",
-	"GOREST_DB_CHARSET",
 	"GOREST_DB_TIMEOUT",
 	"GOREST_DB_CONNECTION_MAX_LIFETIME",
 	"GOREST_DB_MAX_OPEN_CONNECTIONS",
 	"GOREST_DB_MAX_IDLE_CONNECTIONS",
 	"GOREST_DB_QUERY_LOGGING",
-	"GOREST_DB_LIB_DIR",
 	"GOREST_DB_DIRECTORY",
 	"GOREST_DB_MIGRATION",
 	"GOREST_DB_SEEDER",
@@ -209,7 +199,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "sqlserver-starter")
+	t.Setenv("GOREST_APP_NAME", "sqlite-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -220,7 +210,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "sqlserver-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "sqlite-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -373,10 +363,6 @@ func TestConfigRejectsInvalidIntegerEnvironmentValues(t *testing.T) {
 		{
 			name: "database",
 			key:  "GOREST_DB_MAX_OPEN_CONNECTIONS",
-			configure: func(t *testing.T) {
-				t.Setenv("GOREST_DB_USER", "test-user")
-				t.Setenv("GOREST_DB_PASSWORD", "test-password")
-			},
 			load: func() error {
 				_, err := DatabaseConfig()
 				return err
@@ -700,35 +686,28 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToSQLServer(t *testing.T) {
+func TestDatabaseConfigDefaultsToSQLiteWithoutNetworkCredentials(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a SQL Server username and password")
-	}
 
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 	cfg, err := DatabaseConfig()
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "sqlserver" || cfg.Port != "1433" ||
-		cfg.TLS != "mandatory" || cfg.TrustServerCertificate ||
-		cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want SQL Server secure defaults and configured credentials", cfg)
+	if cfg.Driver != "sqlite" || cfg.Name != "gorest" ||
+		cfg.DatabaseDirectory != "./app/database" ||
+		cfg.Username != "" || cfg.Password != "" {
+		t.Errorf("DatabaseConfig() = %+v, want SQLite defaults without network credentials", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonSQLServerDrivers(t *testing.T) {
+func TestDatabaseConfigRejectsNonSQLiteDrivers(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 
-	for _, driver := range []string{"mysql", "postgres", "oracle", "mongo", "scylla", "sqlite"} {
+	for _, driver := range []string{"mysql", "postgres", "sqlserver", "oracle", "mongo", "scylla"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-SQL Server driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-SQLite driver %q", driver)
 			}
 		})
 	}
@@ -736,10 +715,7 @@ func TestDatabaseConfigRejectsNonSQLServerDrivers(t *testing.T) {
 
 func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "disable")
+	t.Setenv("GOREST_DB_DRIVER", "sqlite")
 	t.Setenv("GOREST_DB_CONNECTION_MAX_LIFETIME", "1h")
 	t.Setenv("GOREST_DB_MAX_OPEN_CONNECTIONS", "100")
 	t.Setenv("GOREST_DB_MAX_IDLE_CONNECTIONS", "10")
@@ -756,40 +732,22 @@ func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigMapsSQLServerTLSAndCertificateVerification(t *testing.T) {
+func TestDatabaseConfigMapsSQLiteDatabaseAndStartupOptions(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "mandatory")
-	t.Setenv("GOREST_DB_CA_PATH", "/test/sqlserver-ca.pem")
+	databaseDirectory := t.TempDir()
+	t.Setenv("GOREST_DB_DRIVER", "sqlite")
+	t.Setenv("GOREST_DB_NAME", "test-store")
+	t.Setenv("GOREST_DB_DIRECTORY", databaseDirectory)
+	t.Setenv("GOREST_DB_MIGRATION", "true")
+	t.Setenv("GOREST_DB_SEEDER", "true")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with SQL Server TLS error = %v", err)
+		t.Fatalf("DatabaseConfig() with SQLite options error = %v", err)
 	}
-	if cfg.Driver != "sqlserver" || cfg.TLS != "mandatory" ||
-		cfg.TrustServerCertificate || cfg.SSLCertPath != "/test/sqlserver-ca.pem" ||
-		cfg.SSLCAPath != "/test/sqlserver-ca.pem" || cfg.SSLKeyPath != "" {
-		t.Errorf("SQL Server TLS fields = (driver:%q, TLS:%q, trustServerCertificate:%t, CA:%q, key:%q), want mandatory TLS with certificate verification",
-			cfg.Driver, cfg.TLS, cfg.TrustServerCertificate, cfg.SSLCertPath, cfg.SSLKeyPath)
-	}
-}
-
-func TestDatabaseConfigMapsSQLServerTrustServerCertificate(t *testing.T) {
-	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
-	t.Setenv("GOREST_DB_USER", "test-user")
-	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "strict")
-	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "true")
-
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() with SQL Server certificate trust setting error = %v", err)
-	}
-	if cfg.TLS != "strict" || !cfg.TrustServerCertificate {
-		t.Fatalf("SQL Server TLS fields = (TLS:%q, trustServerCertificate:%t), want configured values",
-			cfg.TLS, cfg.TrustServerCertificate)
+	if cfg.Driver != "sqlite" || cfg.Name != "test-store" ||
+		cfg.DatabaseDirectory != databaseDirectory || !cfg.Migration || !cfg.Seeder {
+		t.Errorf("SQLite config = (driver:%q, name:%q, directory:%q, migration:%t, seeder:%t), want configured values",
+			cfg.Driver, cfg.Name, cfg.DatabaseDirectory, cfg.Migration, cfg.Seeder)
 	}
 }
