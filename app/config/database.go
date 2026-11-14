@@ -9,7 +9,7 @@ import (
 	goresthelper "github.com/elsyahtech/gorest/helper"
 )
 
-// DatabaseConfig loads the PostgreSQL connection settings and optional startup tasks.
+// DatabaseConfig loads the SQL Server connection settings and optional startup tasks.
 func DatabaseConfig() (*database.Config, error) {
 	cfg := database.ConfigDefault
 
@@ -23,16 +23,16 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_DISABLE: %w", err)
 	}
 
-	// This starter supports PostgreSQL only.
+	// This starter supports SQL Server only.
 	cfg.Driver = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_DRIVER",
-		database.POSTGRES,
+		database.SQLSERVER,
 	)
-	if !strings.EqualFold(cfg.Driver, database.POSTGRES) {
-		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the PostgreSQL starter", database.POSTGRES)
+	if !strings.EqualFold(cfg.Driver, database.SQLSERVER) {
+		return &database.Config{}, fmt.Errorf("GOREST_DB_DRIVER must be %q for the SQL Server starter", database.SQLSERVER)
 	}
 
-	cfg.Driver = database.POSTGRES
+	cfg.Driver = database.SQLSERVER
 
 	cfg.Host = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_HOST",
@@ -41,7 +41,7 @@ func DatabaseConfig() (*database.Config, error) {
 
 	cfg.Port = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_PORT",
-		database.POSTGRES_PORT,
+		database.SQLSERVER_PORT,
 	)
 
 	cfg.Name = goresthelper.ReadEnvironmentStringWithDefault(
@@ -73,6 +73,14 @@ func DatabaseConfig() (*database.Config, error) {
 		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_ALLOW_INSECURE_PRODUCTION: %w", err)
 	}
 
+	cfg.TrustServerCertificate, err = goresthelper.ReadEnvironmentBooleanWithDefault(
+		"GOREST_DB_TRUST_SERVER_CERTIFICATE",
+		database.DefaultTrustServerCertificate,
+	)
+	if err != nil {
+		return &database.Config{}, fmt.Errorf("failed to parse GOREST_DB_TRUST_SERVER_CERTIFICATE: %w", err)
+	}
+
 	timeout, err := goresthelper.ReadEnvironmentDurationWithDefault(
 		"GOREST_DB_TIMEOUT",
 		database.DefaultTimeout,
@@ -91,12 +99,7 @@ func DatabaseConfig() (*database.Config, error) {
 
 	cfg.TLS = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_TLS",
-		database.TLSDisabled,
-	)
-
-	cfg.SSLCertPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_CERT_PATH",
-		"",
+		database.TLSMandatory,
 	)
 
 	cfg.SSLCAPath = goresthelper.ReadEnvironmentStringWithDefault(
@@ -104,10 +107,9 @@ func DatabaseConfig() (*database.Config, error) {
 		"",
 	)
 
-	cfg.SSLKeyPath = goresthelper.ReadEnvironmentStringWithDefault(
-		"GOREST_DB_KEY_PATH",
-		"",
-	)
+	// GOREST's SQL Server DSN uses SSLCertPath as the custom server CA bundle.
+	cfg.SSLCertPath = cfg.SSLCAPath
+	cfg.SSLKeyPath = ""
 
 	cfg.Charset = goresthelper.ReadEnvironmentStringWithDefault(
 		"GOREST_DB_CHARSET",

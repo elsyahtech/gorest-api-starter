@@ -4,75 +4,79 @@ package integration_test
 
 import "testing"
 
-func TestLoadPostgreSQLTestConfigAllowsMutualTLS(t *testing.T) {
+func configureSQLServerTestEnvironment(t *testing.T) {
+	t.Helper()
 	t.Setenv("GOREST_APP_ENV", "testing")
 	t.Setenv("GOREST_DB_DISABLE", "false")
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
-	t.Setenv("GOREST_DB_HOST", "postgres.example.test")
-	t.Setenv("GOREST_DB_PORT", "5432")
-	t.Setenv("GOREST_DB_NAME", "gorest_starter_test")
+	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
+	t.Setenv("GOREST_DB_HOST", "sqlserver.example.test")
+	t.Setenv("GOREST_DB_PORT", "")
+	t.Setenv("GOREST_DB_NAME", "gorest-dedicated-db")
 	t.Setenv("GOREST_DB_USER", "integration-user")
 	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
-	t.Setenv("GOREST_DB_TLS", "verify-full")
+	t.Setenv("GOREST_DB_TLS", "mandatory")
 	t.Setenv("GOREST_DB_CA_PATH", "")
-	t.Setenv("GOREST_DB_CERT_PATH", "/test/client.crt")
-	t.Setenv("GOREST_DB_KEY_PATH", "/test/client.key")
-	t.Setenv("GOREST_TEST_POSTGRES_CONFIRM_DATABASE", "gorest_starter_test")
+	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "false")
+	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "gorest-dedicated-db")
+}
 
-	config, err := loadPostgreSQLTestConfig()
+func TestLoadSQLServerTestConfigAcceptsVerifiedTLS(t *testing.T) {
+	configureSQLServerTestEnvironment(t)
+
+	config, err := loadSQLServerTestConfig()
 	if err != nil {
-		t.Fatalf("loadPostgreSQLTestConfig() with server TLS error = %v", err)
+		t.Fatalf("loadSQLServerTestConfig() with verified TLS error = %v", err)
 	}
-	if config.tls != "verify-full" || config.database != "gorest_starter_test" ||
-		config.certPath != "/test/client.crt" || config.keyPath != "/test/client.key" {
-		t.Fatalf("PostgreSQL test configuration = (TLS:%q, database:%q, cert:%q, key:%q), want verified mTLS and test database",
-			config.tls, config.database, config.certPath, config.keyPath)
+	if config.tls != "mandatory" || config.database != "gorest-dedicated-db" ||
+		config.port != "1433" {
+		t.Fatalf("SQL Server test configuration = (TLS:%q, database-set:%t, port:%q), want mandatory TLS, confirmed database, and default port",
+			config.tls, config.database != "", config.port)
 	}
 
 	environment := config.appEnvironment("3000", t.TempDir(), "test-signature-key")
-	if environment["GOREST_DB_DRIVER"] != "postgres" ||
-		environment["GOREST_DB_TLS"] != "verify-full" ||
+	if environment["GOREST_DB_DRIVER"] != "sqlserver" ||
+		environment["GOREST_DB_TLS"] != "mandatory" ||
+		environment["GOREST_DB_CA_PATH"] != "" ||
+		environment["GOREST_DB_TRUST_SERVER_CERTIFICATE"] != "false" ||
 		environment["GOREST_DB_MIGRATION"] != "true" ||
 		environment["GOREST_DB_SEEDER"] != "true" {
-		t.Fatalf("application database environment does not enable PostgreSQL TLS, migration, and seeder")
-	}
-	if environment["GOREST_DB_CERT_PATH"] != config.certPath || environment["GOREST_DB_KEY_PATH"] != config.keyPath {
-		t.Fatal("PostgreSQL application environment did not preserve the client certificate and key")
+		t.Fatal("application environment does not enforce verified SQL Server TLS and enable migration/seeder")
 	}
 }
 
-func TestLoadPostgreSQLTestConfigRequiresExplicitConfirmationForNonTestDatabase(t *testing.T) {
-	t.Setenv("GOREST_APP_ENV", "testing")
-	t.Setenv("GOREST_DB_DISABLE", "false")
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
-	t.Setenv("GOREST_DB_HOST", "postgres.example.test")
-	t.Setenv("GOREST_DB_NAME", "gorest_starter")
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
-	t.Setenv("GOREST_DB_TLS", "verify-full")
-	t.Setenv("GOREST_TEST_POSTGRES_CONFIRM_DATABASE", "")
-	t.Setenv("GOREST_TEST_POSTGRES_ALLOW_NON_TEST_DATABASE", "")
+func TestLoadSQLServerTestConfigRequiresExactDatabaseConfirmation(t *testing.T) {
+	configureSQLServerTestEnvironment(t)
+	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "another-database")
 
-	if _, err := loadPostgreSQLTestConfig(); err == nil {
-		t.Fatal("loadPostgreSQLTestConfig() accepted a non-test database without explicit confirmation")
+	if _, err := loadSQLServerTestConfig(); err == nil {
+		t.Fatal("loadSQLServerTestConfig() accepted a database without exact-name confirmation")
 	}
 }
 
-func TestLoadPostgreSQLTestConfigRequiresClientCertificateAndKey(t *testing.T) {
-	t.Setenv("GOREST_APP_ENV", "testing")
-	t.Setenv("GOREST_DB_DISABLE", "false")
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
-	t.Setenv("GOREST_DB_HOST", "postgres.example.test")
-	t.Setenv("GOREST_DB_NAME", "gorest_starter_test")
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
-	t.Setenv("GOREST_DB_TLS", "verify-full")
-	t.Setenv("GOREST_DB_CERT_PATH", "/test/client.pem")
-	t.Setenv("GOREST_DB_KEY_PATH", "")
-	t.Setenv("GOREST_DB_CA_PATH", "")
-	t.Setenv("GOREST_TEST_POSTGRES_CONFIRM_DATABASE", "gorest_starter_test")
+func TestLoadSQLServerTestConfigRejectsSystemDatabase(t *testing.T) {
+	configureSQLServerTestEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "master")
+	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "master")
 
-	if _, err := loadPostgreSQLTestConfig(); err == nil {
-		t.Fatal("loadPostgreSQLTestConfig() accepted an incomplete client certificate/key pair")
+	if _, err := loadSQLServerTestConfig(); err == nil {
+		t.Fatal("loadSQLServerTestConfig() accepted a SQL Server system database")
+	}
+}
+
+func TestLoadSQLServerTestConfigRejectsUnverifiedServerCertificate(t *testing.T) {
+	configureSQLServerTestEnvironment(t)
+	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "true")
+
+	if _, err := loadSQLServerTestConfig(); err == nil {
+		t.Fatal("loadSQLServerTestConfig() accepted TrustServerCertificate=true")
+	}
+}
+
+func TestLoadSQLServerTestConfigRequiresEncryptedTLS(t *testing.T) {
+	configureSQLServerTestEnvironment(t)
+	t.Setenv("GOREST_DB_TLS", "disable")
+
+	if _, err := loadSQLServerTestConfig(); err == nil {
+		t.Fatal("loadSQLServerTestConfig() accepted disabled SQL Server TLS")
 	}
 }

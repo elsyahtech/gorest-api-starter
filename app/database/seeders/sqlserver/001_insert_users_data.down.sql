@@ -1,0 +1,2 @@
+DELETE FROM dbo.users
+WHERE id LIKE '3746e32f-1bd6-4023-a608-f535696f5e%';

@@ -21,16 +21,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestPostgreSQLUserLibraryAgainstDatabase(t *testing.T) {
-	testConfig, err := loadPostgreSQLTestConfig()
+func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
+	testConfig, err := loadSQLServerTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyPostgreSQLTestConfig(t, testConfig)
+	applySQLServerTestConfig(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
-		t.Fatalf("load PostgreSQL library-test configuration: %v", err)
+		t.Fatalf("load SQL Server library-test configuration: %v", err)
 	}
 	dbConfig.Migration = true
 	dbConfig.Seeder = false
@@ -40,7 +40,7 @@ func TestPostgreSQLUserLibraryAgainstDatabase(t *testing.T) {
 	app.Use(log.Run(log.ConfigDefault), database.Run(*dbConfig))
 	t.Cleanup(func() {
 		if _, _, err := app.Close(); err != nil {
-			t.Errorf("close PostgreSQL library-test application: %v", err)
+			t.Errorf("close SQL Server library-test application: %v", err)
 		}
 	})
 
@@ -51,11 +51,11 @@ func TestPostgreSQLUserLibraryAgainstDatabase(t *testing.T) {
 	testDB, message, err := database.New(ctx, &preflightConfig, gorest.DefaultTimezone)
 	cancel()
 	if err != nil {
-		t.Fatalf("connect to PostgreSQL library-test database (%s): %v", message, err)
+		t.Fatalf("connect to SQL Server library-test database (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
 		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close PostgreSQL library-test connection: %v", err)
+			t.Errorf("close SQL Server library-test connection: %v", err)
 		}
 	})
 
@@ -76,11 +76,11 @@ func TestPostgreSQLUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	message, status, err := userLibrary.CreateUser(user)
 	if err != nil || status != http.StatusOK || message == "" {
-		t.Fatalf("CreateUser() = (%q, %d, %v), want successful PostgreSQL persistence", message, status, err)
+		t.Fatalf("CreateUser() = (%q, %d, %v), want successful SQL Server persistence", message, status, err)
 	}
 
 	var storedPassword string
-	if err := testDB.SQL.QueryRow("SELECT password FROM users WHERE id = $1", userID).Scan(&storedPassword); err != nil {
+	if err := testDB.SQL.QueryRow("SELECT password FROM dbo.users WHERE id = @p1", userID).Scan(&storedPassword); err != nil {
 		t.Fatalf("read password persisted by UserLibrary: %v", err)
 	}
 	if storedPassword == plainPassword || storedPassword == "" {
@@ -88,12 +88,12 @@ func TestPostgreSQLUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	passwordMatches, _, _, err := helper.VerifyArgon(plainPassword, storedPassword)
 	if err != nil || !passwordMatches {
-		t.Fatalf("verify PostgreSQL password hash: matches=%t, err=%v", passwordMatches, err)
+		t.Fatalf("verify SQL Server password hash: matches=%t, err=%v", passwordMatches, err)
 	}
 
 	users, message, status, err := userLibrary.GetUsers()
 	if err != nil || status != http.StatusOK || message == "" || users == nil {
-		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want PostgreSQL users", users == nil, message, status, err)
+		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want SQL Server users", users == nil, message, status, err)
 	}
 	found := false
 	for _, listedUser := range *users {
@@ -119,7 +119,7 @@ func cleanupUserByID(t *testing.T, db interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }, id string) {
 	t.Helper()
-	if _, err := db.Exec("DELETE FROM users WHERE id = $1", id); err != nil {
-		t.Errorf("clean up PostgreSQL library-test user %s: %v", id, err)
+	if _, err := db.Exec("DELETE FROM dbo.users WHERE id = @p1", id); err != nil {
+		t.Errorf("clean up SQL Server library-test user %s: %v", id, err)
 	}
 }

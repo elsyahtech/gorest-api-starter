@@ -76,6 +76,8 @@ service-account*.json
 /app/database/var/
 /cert/
 /postgres-cert/
+/mysql-cert/
+/sqlserver-cert/
 /app/handler/logs/
 /app/router/logs/
 /integration-test/logs/

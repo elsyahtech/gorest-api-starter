@@ -52,63 +52,57 @@ jobs:
           retention-days: 30
 
   integration-config:
-    name: Check PostgreSQL mTLS test configuration
+    name: Check SQL Server test configuration
     runs-on: ubuntu-24.04
     outputs:
       configured: ${{ steps.check.outputs.configured }}
     steps:
-      - name: Check required PostgreSQL test secrets
+      - name: Check required SQL Server test secrets
         id: check
         shell: bash
         env:
-          POSTGRES_HOST: ${{ secrets.GOREST_TEST_POSTGRES_HOST }}
-          POSTGRES_DATABASE: ${{ secrets.GOREST_TEST_POSTGRES_DATABASE }}
-          POSTGRES_USER: ${{ secrets.GOREST_TEST_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.GOREST_TEST_POSTGRES_PASSWORD }}
-          POSTGRES_TLS: ${{ secrets.GOREST_TEST_POSTGRES_TLS }}
-          POSTGRES_CA_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CA_PEM }}
-          POSTGRES_CLIENT_CERT_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CLIENT_CERT_PEM }}
-          POSTGRES_CLIENT_KEY_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CLIENT_KEY_PEM }}
-          POSTGRES_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_POSTGRES_CONFIRM_DATABASE }}
-          POSTGRES_ALLOW_NON_TEST_DATABASE: ${{ secrets.GOREST_TEST_POSTGRES_ALLOW_NON_TEST_DATABASE }}
+          SQLSERVER_HOST: ${{ secrets.GOREST_TEST_SQLSERVER_HOST }}
+          SQLSERVER_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_DATABASE }}
+          SQLSERVER_USER: ${{ secrets.GOREST_TEST_SQLSERVER_USER }}
+          SQLSERVER_PASSWORD: ${{ secrets.GOREST_TEST_SQLSERVER_PASSWORD }}
+          SQLSERVER_TLS: ${{ secrets.GOREST_TEST_SQLSERVER_TLS }}
+          SQLSERVER_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_CONFIRM_DATABASE }}
         run: |
           configured=true
-          if [[ -z "$POSTGRES_HOST" || -z "$POSTGRES_DATABASE" || -z "$POSTGRES_USER" ||
-                -z "$POSTGRES_PASSWORD" || -z "$POSTGRES_CA_PEM" ||
-                -z "$POSTGRES_CLIENT_CERT_PEM" || -z "$POSTGRES_CLIENT_KEY_PEM" ]]; then
+          if [[ -z "$SQLSERVER_HOST" || -z "$SQLSERVER_DATABASE" || -z "$SQLSERVER_USER" ||
+                -z "$SQLSERVER_PASSWORD" ]]; then
             configured=false
-          elif [[ "$POSTGRES_TLS" != "verify-ca" && "$POSTGRES_TLS" != "verify-full" ]]; then
+          elif [[ "$SQLSERVER_TLS" != "mandatory" && "$SQLSERVER_TLS" != "strict" ]]; then
             configured=false
-          elif [[ "$POSTGRES_CONFIRM_DATABASE" != "$POSTGRES_DATABASE" ]]; then
+          elif [[ "$SQLSERVER_CONFIRM_DATABASE" != "$SQLSERVER_DATABASE" ]]; then
             configured=false
-          elif [[ "$POSTGRES_DATABASE" != *_test && "$POSTGRES_DATABASE" != *_testing &&
-                  "$POSTGRES_ALLOW_NON_TEST_DATABASE" != "$POSTGRES_DATABASE" ]]; then
+          elif [[ "${SQLSERVER_DATABASE,,}" == "master" || "${SQLSERVER_DATABASE,,}" == "model" ||
+                  "${SQLSERVER_DATABASE,,}" == "msdb" || "${SQLSERVER_DATABASE,,}" == "tempdb" ]]; then
             configured=false
           fi
 
           echo "configured=$configured" >> "$GITHUB_OUTPUT"
           if [[ "$configured" == "false" ]]; then
-            echo "PostgreSQL integration tests skipped: configure all required GOREST_TEST_POSTGRES_* secrets for a dedicated non-production mTLS database."
+            echo "SQL Server integration tests skipped: configure all required GOREST_TEST_SQLSERVER_* secrets for a dedicated non-production database."
           fi
 
   integration:
-    name: PostgreSQL mTLS integration tests
+    name: SQL Server integration tests
     runs-on: ubuntu-24.04
     needs: integration-config
     if: needs.integration-config.outputs.configured == 'true'
     env:
-      GODEBUG: netdns=cgo
       GOREST_APP_ENV: testing
       GOREST_DB_DISABLE: "false"
-      GOREST_DB_DRIVER: postgres
-      GOREST_DB_HOST: ${{ secrets.GOREST_TEST_POSTGRES_HOST }}
-      GOREST_DB_PORT: ${{ secrets.GOREST_TEST_POSTGRES_PORT }}
-      GOREST_DB_NAME: ${{ secrets.GOREST_TEST_POSTGRES_DATABASE }}
-      GOREST_DB_USER: ${{ secrets.GOREST_TEST_POSTGRES_USER }}
-      GOREST_DB_PASSWORD: ${{ secrets.GOREST_TEST_POSTGRES_PASSWORD }}
-      GOREST_DB_TLS: ${{ secrets.GOREST_TEST_POSTGRES_TLS }}
-      GOREST_TEST_POSTGRES_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_POSTGRES_CONFIRM_DATABASE }}
-      GOREST_TEST_POSTGRES_ALLOW_NON_TEST_DATABASE: ${{ secrets.GOREST_TEST_POSTGRES_ALLOW_NON_TEST_DATABASE }}
+      GOREST_DB_DRIVER: sqlserver
+      GOREST_DB_HOST: ${{ secrets.GOREST_TEST_SQLSERVER_HOST }}
+      GOREST_DB_PORT: ${{ secrets.GOREST_TEST_SQLSERVER_PORT }}
+      GOREST_DB_NAME: ${{ secrets.GOREST_TEST_SQLSERVER_DATABASE }}
+      GOREST_DB_USER: ${{ secrets.GOREST_TEST_SQLSERVER_USER }}
+      GOREST_DB_PASSWORD: ${{ secrets.GOREST_TEST_SQLSERVER_PASSWORD }}
+      GOREST_DB_TLS: ${{ secrets.GOREST_TEST_SQLSERVER_TLS }}
+      GOREST_DB_TRUST_SERVER_CERTIFICATE: "false"
+      GOREST_TEST_SQLSERVER_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_CONFIRM_DATABASE }}
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -119,31 +113,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Configure PostgreSQL mTLS certificates
-        shell: bash
-        env:
-          POSTGRES_CA_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CA_PEM }}
-          POSTGRES_CLIENT_CERT_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CLIENT_CERT_PEM }}
-          POSTGRES_CLIENT_KEY_PEM: ${{ secrets.GOREST_TEST_POSTGRES_CLIENT_KEY_PEM }}
-        run: |
-          set -euo pipefail
-          umask 077
-          ca_file="$RUNNER_TEMP/gorest-postgres-ca.pem"
-          cert_file="$RUNNER_TEMP/gorest-postgres-client-cert.pem"
-          key_file="$RUNNER_TEMP/gorest-postgres-client-key.pem"
-          printf '%s\n' "$POSTGRES_CA_PEM" > "$ca_file"
-          printf '%s\n' "$POSTGRES_CLIENT_CERT_PEM" > "$cert_file"
-          printf '%s\n' "$POSTGRES_CLIENT_KEY_PEM" > "$key_file"
-          openssl x509 -in "$ca_file" -noout
-          openssl x509 -in "$cert_file" -noout
-          openssl pkey -in "$key_file" -noout
-          {
-            printf 'GOREST_DB_CA_PATH=%s\n' "$ca_file"
-            printf 'GOREST_DB_CERT_PATH=%s\n' "$cert_file"
-            printf 'GOREST_DB_KEY_PATH=%s\n' "$key_file"
-          } >> "$GITHUB_ENV"
-
-      - name: Run PostgreSQL integration tests and reports
+      - name: Run SQL Server integration tests and reports
         run: make integration-reports
 
       - name: Upload integration coverage to Codecov
@@ -158,7 +128,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: postgres-integration-report-${{ github.sha }}
+          name: sqlserver-integration-report-${{ github.sha }}
           path: |
             coverage/integration-test.txt
             coverage/integration-test.json

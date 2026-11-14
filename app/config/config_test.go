@@ -120,9 +120,8 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_DB_PASSWORD",
 	"GOREST_DB_TLS",
 	"GOREST_DB_ALLOW_INSECURE_PRODUCTION",
-	"GOREST_DB_CERT_PATH",
-	"GOREST_DB_KEY_PATH",
 	"GOREST_DB_CA_PATH",
+	"GOREST_DB_TRUST_SERVER_CERTIFICATE",
 	"GOREST_DB_CHARSET",
 	"GOREST_DB_TIMEOUT",
 	"GOREST_DB_CONNECTION_MAX_LIFETIME",
@@ -210,7 +209,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "postgres-starter")
+	t.Setenv("GOREST_APP_NAME", "sqlserver-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -221,7 +220,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "postgres-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "sqlserver-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -701,10 +700,10 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToPostgreSQL(t *testing.T) {
+func TestDatabaseConfigRequiresCredentialsAndDefaultsToSQLServer(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a PostgreSQL username and password")
+		t.Fatal("DatabaseConfig() succeeded without a SQL Server username and password")
 	}
 
 	t.Setenv("GOREST_DB_USER", "integration-user")
@@ -713,22 +712,23 @@ func TestDatabaseConfigRequiresCredentialsAndDefaultsToPostgreSQL(t *testing.T) 
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "postgres" || cfg.Port != "5432" ||
+	if cfg.Driver != "sqlserver" || cfg.Port != "1433" ||
+		cfg.TLS != "mandatory" || cfg.TrustServerCertificate ||
 		cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want PostgreSQL defaults and configured credentials", cfg)
+		t.Errorf("DatabaseConfig() = %+v, want SQL Server secure defaults and configured credentials", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonPostgreSQLDrivers(t *testing.T) {
+func TestDatabaseConfigRejectsNonSQLServerDrivers(t *testing.T) {
 	isolateConfigurationEnvironment(t)
 	t.Setenv("GOREST_DB_USER", "integration-user")
 	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 
-	for _, driver := range []string{"mysql", "sqlserver", "oracle", "mongo", "scylla", "sqlite"} {
+	for _, driver := range []string{"mysql", "postgres", "oracle", "mongo", "scylla", "sqlite"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-PostgreSQL driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-SQL Server driver %q", driver)
 			}
 		})
 	}
@@ -736,7 +736,7 @@ func TestDatabaseConfigRejectsNonPostgreSQLDrivers(t *testing.T) {
 
 func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
+	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
 	t.Setenv("GOREST_DB_TLS", "disable")
@@ -756,44 +756,40 @@ func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigMapsPostgreSQLTLSWithoutClientCertificate(t *testing.T) {
+func TestDatabaseConfigMapsSQLServerTLSAndCertificateVerification(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
+	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "verify-full")
-	t.Setenv("GOREST_DB_CERT_PATH", "")
-	t.Setenv("GOREST_DB_KEY_PATH", "")
-	t.Setenv("GOREST_DB_CA_PATH", "")
+	t.Setenv("GOREST_DB_TLS", "mandatory")
+	t.Setenv("GOREST_DB_CA_PATH", "/test/sqlserver-ca.pem")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with PostgreSQL server TLS error = %v", err)
+		t.Fatalf("DatabaseConfig() with SQL Server TLS error = %v", err)
 	}
-	if cfg.Driver != "postgres" || cfg.TLS != "verify-full" ||
-		cfg.SSLCAPath != "" || cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
-		t.Errorf("PostgreSQL TLS fields = (driver:%q, TLS:%q, CA:%q, cert:%q, key:%q), want verified server TLS without client credentials",
-			cfg.Driver, cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
+	if cfg.Driver != "sqlserver" || cfg.TLS != "mandatory" ||
+		cfg.TrustServerCertificate || cfg.SSLCertPath != "/test/sqlserver-ca.pem" ||
+		cfg.SSLCAPath != "/test/sqlserver-ca.pem" || cfg.SSLKeyPath != "" {
+		t.Errorf("SQL Server TLS fields = (driver:%q, TLS:%q, trustServerCertificate:%t, CA:%q, key:%q), want mandatory TLS with certificate verification",
+			cfg.Driver, cfg.TLS, cfg.TrustServerCertificate, cfg.SSLCertPath, cfg.SSLKeyPath)
 	}
 }
 
-func TestDatabaseConfigMapsPostgreSQLServerCAWithoutClientCertificate(t *testing.T) {
+func TestDatabaseConfigMapsSQLServerTrustServerCertificate(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "postgres")
+	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "verify-full")
-	t.Setenv("GOREST_DB_CA_PATH", "/test/ca.pem")
-	t.Setenv("GOREST_DB_CERT_PATH", "")
-	t.Setenv("GOREST_DB_KEY_PATH", "")
+	t.Setenv("GOREST_DB_TLS", "strict")
+	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "true")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with PostgreSQL CA path error = %v", err)
+		t.Fatalf("DatabaseConfig() with SQL Server certificate trust setting error = %v", err)
 	}
-	if cfg.TLS != "verify-full" || cfg.SSLCAPath != "/test/ca.pem" ||
-		cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
-		t.Fatalf("PostgreSQL TLS fields = (TLS:%q, CA:%q, cert:%q, key:%q), want server CA without client credentials",
-			cfg.TLS, cfg.SSLCAPath, cfg.SSLCertPath, cfg.SSLKeyPath)
+	if cfg.TLS != "strict" || !cfg.TrustServerCertificate {
+		t.Fatalf("SQL Server TLS fields = (TLS:%q, trustServerCertificate:%t), want configured values",
+			cfg.TLS, cfg.TrustServerCertificate)
 	}
 }

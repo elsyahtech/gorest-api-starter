@@ -8,9 +8,9 @@ The sample uses GOREST v1.1.21. Application settings use `GOREST_APP_*`; the HTT
 
 Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md).
 
-## PostgreSQL
+## SQL Server
 
-PostgreSQL connection variables are documented in the [PostgreSQL configuration guide](./database.md). Use `GOREST_DB_TLS=verify-full` to verify the server certificate and hostname. Configure `GOREST_DB_CA_PATH` for a private server CA, and configure both client certificate paths when the server requires mTLS. The PostgreSQL server must also trust and require client certificates; client-side settings do not enable server-side enforcement. GOREST v1.1.21 supports verified PostgreSQL TLS and client certificates through the database configuration.
+SQL Server connection variables are documented in the [SQL Server configuration guide](./database.md). The starter defaults to `GOREST_DB_TLS=mandatory` and `GOREST_DB_TRUST_SERVER_CERTIFICATE=false`, which encrypts connections and validates the server certificate. The certificate chain must be trusted by the host operating system or supplied through `GOREST_DB_CA_PATH`, and the configured host must match its subject alternative names. Do not enable `GOREST_DB_TRUST_SERVER_CERTIFICATE` in production.
 
 ## Redis (optional)
 
