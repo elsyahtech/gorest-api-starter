@@ -28,32 +28,32 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestSQLServerUserEndpointsOverHTTP(t *testing.T) {
-	testConfig, err := loadSQLServerTestConfig()
+func TestOracleUserEndpointsOverHTTP(t *testing.T) {
+	testConfig, err := loadOracleTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	applySQLServerTestConfig(t, testConfig)
+	applyOracleTestConfig(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
 		t.Fatalf("load test database configuration: %v", err)
 	}
-	if dbConfig.Driver != database.SQLSERVER || dbConfig.Name != testConfig.database {
-		t.Fatalf("database configuration is not the selected SQL Server test database")
+	if dbConfig.Driver != database.ORACLE || dbConfig.Name != testConfig.serviceName {
+		t.Fatalf("database configuration is not the selected Oracle service")
 	}
 	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 15*time.Second)
 	testDB, message, err := database.New(databaseContext, dbConfig, gorest.DefaultTimezone)
 	cancelDatabase()
 	if err != nil {
-		t.Fatalf("connect to configured SQL Server test database (%s): %v", message, err)
+		t.Fatalf("connect to configured Oracle test service (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
 		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close SQL Server test database connection: %v", err)
+			t.Errorf("close Oracle test database connection: %v", err)
 		}
 	})
-	// Release the preflight connection before the application uses the test account.
+	// Release the preflight connection before the application opens another Oracle session.
 	testDB.SQL.SetMaxIdleConns(0)
 
 	signatureKeyBytes := make([]byte, 48)
@@ -64,7 +64,7 @@ func TestSQLServerUserEndpointsOverHTTP(t *testing.T) {
 	baseURL, stopApp := startApplication(t, testConfig, signatureKey)
 	defer stopApp()
 	requireUsersTable(t, testDB.SQL)
-	requireSQLServerSeedData(t, testDB.SQL)
+	requireOracleSeedData(t, testDB.SQL)
 
 	testID := uuid.NewString()
 	testEmail := "integration+" + strings.ReplaceAll(testID, "-", "") + "@example.test"
@@ -95,23 +95,23 @@ func TestSQLServerUserEndpointsOverHTTP(t *testing.T) {
 		testEmail,
 		testPassword,
 	)
-	t.Run("creates a SQL Server user", func(t *testing.T) {
+	t.Run("creates an Oracle user", func(t *testing.T) {
 		response := requestJSON(t, client, http.MethodPost, baseURL+"/users/create", createRequest, "")
 		if response.status != http.StatusOK || response.json["success"] != true {
 			t.Fatalf("create response = (%d, %s), want HTTP 200 success", response.status, response.body)
 		}
 
 		var storedID, storedEmail, storedPassword string
-		var active bool
+		var active int64
 		err := testDB.SQL.QueryRow(
-			"SELECT id, email, password, is_active FROM dbo.users WHERE id = @p1",
+			"SELECT id, email, password, is_active FROM users WHERE id = :1",
 			testID,
 		).Scan(&storedID, &storedEmail, &storedPassword, &active)
 		if err != nil {
-			t.Fatalf("read created user from SQL Server: %v", err)
+			t.Fatalf("read created user from Oracle: %v", err)
 		}
-		if storedID != testID || storedEmail != testEmail || !active || storedPassword == testPassword {
-			t.Fatalf("persisted user = (%q, %q, %t, password-set:%t), want created user with hashed password",
+		if storedID != testID || storedEmail != testEmail || active != 1 || storedPassword == testPassword {
+			t.Fatalf("persisted user = (%q, %q, is_active:%d, password-set:%t), want created user with hashed password",
 				storedID, storedEmail, active, storedPassword != "")
 		}
 	})
@@ -123,7 +123,7 @@ func TestSQLServerUserEndpointsOverHTTP(t *testing.T) {
 		}
 
 		var count int
-		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM dbo.users WHERE id = @p1", testID).Scan(&count); err != nil {
+		if err := testDB.SQL.QueryRow("SELECT COUNT(*) FROM users WHERE id = :1", testID).Scan(&count); err != nil {
 			t.Fatalf("count duplicate test user rows: %v", err)
 		}
 		if count != 1 {
@@ -226,26 +226,26 @@ func requireUsersTable(t *testing.T, db interface {
 
 	var tableCount int
 	if err := db.QueryRow(
-		"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = DB_NAME() AND table_schema = 'dbo' AND table_name = 'users'",
+		"SELECT COUNT(*) FROM user_tables WHERE table_name = 'USERS'",
 	).Scan(&tableCount); err != nil {
-		t.Fatalf("check the SQL Server users table: %v", err)
+		t.Fatalf("check the Oracle users table: %v", err)
 	}
 	if tableCount != 1 {
-		t.Fatal("SQL Server test database does not contain the users table after running the migration")
+		t.Fatal("Oracle test schema does not contain the users table after running the migration")
 	}
 }
 
-func requireSQLServerSeedData(t *testing.T, db interface {
+func requireOracleSeedData(t *testing.T, db interface {
 	QueryRow(query string, args ...any) *sql.Row
 }) {
 	t.Helper()
 
 	var count int
-	if err := db.QueryRow("SELECT COUNT(*) FROM dbo.users WHERE id LIKE '3746e32f-1bd6-4023-a608-f535696f5e%'").Scan(&count); err != nil {
-		t.Fatalf("verify SQL Server seed data: %v", err)
+	if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id LIKE '3746e32f-1bd6-4023-a608-f535696f5e%'").Scan(&count); err != nil {
+		t.Fatalf("verify Oracle seed data: %v", err)
 	}
 	if count != 10 {
-		t.Fatalf("SQL Server seeder created %d sample users, want 10", count)
+		t.Fatalf("Oracle seeder created %d sample users, want 10", count)
 	}
 }
 
@@ -254,25 +254,25 @@ func cleanupUser(t *testing.T, db interface {
 }, id, email string) {
 	t.Helper()
 
-	if _, err := db.Exec("DELETE FROM dbo.users WHERE id = @p1 AND email = @p2", id, email); err != nil {
+	if _, err := db.Exec("DELETE FROM users WHERE id = :1 AND email = :2", id, email); err != nil {
 		t.Errorf("clean up integration user %s: %v", id, err)
 	}
 }
 
-func applySQLServerTestConfig(t *testing.T, config sqlServerTestConfig) {
+func applyOracleTestConfig(t *testing.T, config oracleTestConfig) {
 	t.Helper()
 	for key, value := range map[string]string{
 		"GOREST_APP_ENV":                      "testing",
 		"GOREST_DB_DISABLE":                   "false",
-		"GOREST_DB_DRIVER":                    database.SQLSERVER,
+		"GOREST_DB_DRIVER":                    database.ORACLE,
 		"GOREST_DB_HOST":                      config.host,
 		"GOREST_DB_PORT":                      config.port,
-		"GOREST_DB_NAME":                      config.database,
+		"GOREST_DB_NAME":                      config.serviceName,
 		"GOREST_DB_USER":                      config.username,
 		"GOREST_DB_PASSWORD":                  config.password,
 		"GOREST_DB_TLS":                       config.tls,
-		"GOREST_DB_CA_PATH":                   config.caPath,
-		"GOREST_DB_TRUST_SERVER_CERTIFICATE":  "false",
+		"GOREST_DB_CA_PATH":                   config.walletPath,
+		"GOREST_DB_LIB_DIR_PATH":              config.libDir,
 		"GOREST_DB_DIRECTORY":                 config.databaseDirectory,
 		"GOREST_DB_MIGRATION":                 "true",
 		"GOREST_DB_SEEDER":                    "true",
@@ -282,7 +282,7 @@ func applySQLServerTestConfig(t *testing.T, config sqlServerTestConfig) {
 	}
 }
 
-func startApplication(t *testing.T, config sqlServerTestConfig, signatureKey string) (string, func()) {
+func startApplication(t *testing.T, config oracleTestConfig, signatureKey string) (string, func()) {
 	t.Helper()
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")

@@ -8,14 +8,14 @@ make release-check
 
 This runs the repository's formatting, static analysis, unit tests, lint, secret scan, and build checks. The required Go and tool versions are pinned in the repository.
 
-To check SQL Server behavior, configure the dedicated non-production database described in [Testing](./testing.md), then run:
+To check Oracle behavior, install a compatible Oracle Instant Client, configure the dedicated non-production schema described in [Testing](./testing.md), set the exact schema confirmation, and run:
 
 ```sh
 make test-integration
 ```
 
-For combined test output and application coverage, use `make integration-reports`. That command runs all tagged integration tests; optional Redis checks may connect to Redis if its configuration is enabled. Review the [Redis setup guidance](./configuration.md#redis-optional) before enabling it.
+For combined test output and application coverage, use `make integration-reports`. That command runs all tagged integration tests; the Oracle suite writes to the confirmed schema, and optional Redis checks may connect to Redis if its configuration is enabled.
 
-GitHub Actions runs the unit checks automatically. Its SQL Server integration job runs only when the required database secrets are configured; without them, that job is skipped and no integration result is produced.
+GitHub Actions runs unit tests and isolated Oracle integration-configuration checks. It does not connect to Oracle because the full integration suite requires an Oracle client, optional wallet, and a dedicated schema.
 
-The starter currently uses GOREST v1.1.21 and the Go version in `go.mod`. Before changing framework or Go versions, review the target version's documentation and compatibility notes, then rerun the applicable checks and SQL Server integration tests.
+The starter currently uses GOREST v1.1.21 and the Go version in `go.mod`. Before changing framework or Go versions, review the target version's documentation and compatibility notes, then rerun the applicable checks and Oracle integration tests.

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elsyahtech/gorest"
+	"github.com/elsyahtech/gorest/database"
 	"github.com/elsyahtech/gorest/filter"
 	gorestserver "github.com/elsyahtech/gorest/server"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -121,14 +122,12 @@ var configurationEnvironmentKeys = []string{
 	"GOREST_DB_TLS",
 	"GOREST_DB_ALLOW_INSECURE_PRODUCTION",
 	"GOREST_DB_CA_PATH",
-	"GOREST_DB_TRUST_SERVER_CERTIFICATE",
-	"GOREST_DB_CHARSET",
 	"GOREST_DB_TIMEOUT",
 	"GOREST_DB_CONNECTION_MAX_LIFETIME",
 	"GOREST_DB_MAX_OPEN_CONNECTIONS",
 	"GOREST_DB_MAX_IDLE_CONNECTIONS",
 	"GOREST_DB_QUERY_LOGGING",
-	"GOREST_DB_LIB_DIR",
+	"GOREST_DB_LIB_DIR_PATH",
 	"GOREST_DB_DIRECTORY",
 	"GOREST_DB_MIGRATION",
 	"GOREST_DB_SEEDER",
@@ -209,7 +208,7 @@ func TestLoadFiltersUsesDefaultConfiguration(t *testing.T) {
 
 func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_APP_NAME", "sqlserver-starter")
+	t.Setenv("GOREST_APP_NAME", "oracle-starter")
 	t.Setenv("GOREST_APP_VERSION", "v2.3.4")
 	t.Setenv("GOREST_APP_ENV", gorest.Production)
 	t.Setenv("GOREST_APP_TIMEZONE", "Asia/Jakarta")
@@ -220,7 +219,7 @@ func TestAppConfigUsesEnvironmentFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppConfig() error = %v", err)
 	}
-	if cfg.AppName != "sqlserver-starter" || cfg.Version != "v2.3.4" ||
+	if cfg.AppName != "oracle-starter" || cfg.Version != "v2.3.4" ||
 		cfg.Environment != gorest.Production || cfg.Timezone != "Asia/Jakarta" ||
 		!cfg.Debug || cfg.CheckForUpdates == nil || *cfg.CheckForUpdates {
 		t.Errorf("AppConfig() = %+v, want configured app fields and updates disabled", cfg)
@@ -374,6 +373,7 @@ func TestConfigRejectsInvalidIntegerEnvironmentValues(t *testing.T) {
 			name: "database",
 			key:  "GOREST_DB_MAX_OPEN_CONNECTIONS",
 			configure: func(t *testing.T) {
+				t.Setenv("GOREST_DB_NAME", "FREEPDB1")
 				t.Setenv("GOREST_DB_USER", "test-user")
 				t.Setenv("GOREST_DB_PASSWORD", "test-password")
 			},
@@ -700,35 +700,57 @@ func TestLoadServerBlankEnvironmentUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigRequiresCredentialsAndDefaultsToSQLServer(t *testing.T) {
+func TestDatabaseConfigRequiresOracleServiceAndCredentials(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	if _, err := DatabaseConfig(); err == nil {
-		t.Fatal("DatabaseConfig() succeeded without a SQL Server username and password")
+	tests := []struct {
+		name        string
+		serviceName string
+		username    string
+		password    string
+	}{
+		{name: "service name", username: "test-user", password: "test-password"},
+		{name: "username", serviceName: "FREEPDB1", password: "test-password"},
+		{name: "password", serviceName: "FREEPDB1", username: "test-user"},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			isolateConfigurationEnvironment(t)
+			t.Setenv("GOREST_DB_NAME", test.serviceName)
+			t.Setenv("GOREST_DB_USER", test.username)
+			t.Setenv("GOREST_DB_PASSWORD", test.password)
+			if _, err := DatabaseConfig(); err == nil {
+				t.Fatal("DatabaseConfig() succeeded without the required Oracle service name and credentials")
+			}
+		})
+	}
+}
 
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
+func TestDatabaseConfigDefaultsToOracle(t *testing.T) {
+	isolateConfigurationEnvironment(t)
+	t.Setenv("GOREST_DB_NAME", "FREEPDB1")
+	t.Setenv("GOREST_DB_USER", " test-user ")
+	t.Setenv("GOREST_DB_PASSWORD", " test-password ")
+
 	cfg, err := DatabaseConfig()
 	if err != nil {
 		t.Fatalf("DatabaseConfig() error = %v", err)
 	}
-	if cfg.Driver != "sqlserver" || cfg.Port != "1433" ||
-		cfg.TLS != "mandatory" || cfg.TrustServerCertificate ||
-		cfg.Username != "integration-user" || cfg.Password != "integration-password" {
-		t.Errorf("DatabaseConfig() = %+v, want SQL Server secure defaults and configured credentials", cfg)
+	if cfg.Driver != database.ORACLE || cfg.Port != database.ORACLE_PORT ||
+		cfg.Name != "FREEPDB1" || cfg.TLS != database.TLSDisabled ||
+		cfg.Username != "test-user" || cfg.Password != "test-password" ||
+		cfg.LibDir != "" || cfg.SSLCAPath != "" || cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
+		t.Errorf("DatabaseConfig() = %+v, want Oracle defaults and trimmed credentials", cfg)
 	}
 }
 
-func TestDatabaseConfigRejectsNonSQLServerDrivers(t *testing.T) {
+func TestDatabaseConfigRejectsNonOracleDrivers(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_USER", "integration-user")
-	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
 
-	for _, driver := range []string{"mysql", "postgres", "oracle", "mongo", "scylla", "sqlite"} {
+	for _, driver := range []string{"mysql", "postgres", "sqlserver", "mongo", "scylla", "sqlite"} {
 		t.Run(driver, func(t *testing.T) {
 			t.Setenv("GOREST_DB_DRIVER", driver)
 			if _, err := DatabaseConfig(); err == nil {
-				t.Fatalf("DatabaseConfig() accepted non-SQL Server driver %q", driver)
+				t.Fatalf("DatabaseConfig() accepted non-Oracle driver %q", driver)
 			}
 		})
 	}
@@ -736,10 +758,9 @@ func TestDatabaseConfigRejectsNonSQLServerDrivers(t *testing.T) {
 
 func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
+	t.Setenv("GOREST_DB_NAME", "FREEPDB1")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "disable")
 	t.Setenv("GOREST_DB_CONNECTION_MAX_LIFETIME", "1h")
 	t.Setenv("GOREST_DB_MAX_OPEN_CONNECTIONS", "100")
 	t.Setenv("GOREST_DB_MAX_IDLE_CONNECTIONS", "10")
@@ -756,40 +777,36 @@ func TestDatabaseConfigMapsConnectionPoolFields(t *testing.T) {
 	}
 }
 
-func TestDatabaseConfigMapsSQLServerTLSAndCertificateVerification(t *testing.T) {
+func TestDatabaseConfigMapsOracleWalletAndInstantClient(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
+	t.Setenv("GOREST_DB_NAME", "FREEPDB1")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "mandatory")
-	t.Setenv("GOREST_DB_CA_PATH", "/test/sqlserver-ca.pem")
+	t.Setenv("GOREST_DB_TLS", "enable")
+	t.Setenv("GOREST_DB_CA_PATH", "/test/oracle-wallet")
+	t.Setenv("GOREST_DB_LIB_DIR_PATH", "/opt/oracle/instantclient")
 
 	cfg, err := DatabaseConfig()
 	if err != nil {
-		t.Fatalf("DatabaseConfig() with SQL Server TLS error = %v", err)
+		t.Fatalf("DatabaseConfig() with Oracle TCPS settings error = %v", err)
 	}
-	if cfg.Driver != "sqlserver" || cfg.TLS != "mandatory" ||
-		cfg.TrustServerCertificate || cfg.SSLCertPath != "/test/sqlserver-ca.pem" ||
-		cfg.SSLCAPath != "/test/sqlserver-ca.pem" || cfg.SSLKeyPath != "" {
-		t.Errorf("SQL Server TLS fields = (driver:%q, TLS:%q, trustServerCertificate:%t, CA:%q, key:%q), want mandatory TLS with certificate verification",
-			cfg.Driver, cfg.TLS, cfg.TrustServerCertificate, cfg.SSLCertPath, cfg.SSLKeyPath)
+	if cfg.Driver != database.ORACLE || cfg.TLS != database.TLSEnabled ||
+		cfg.SSLCAPath != "/test/oracle-wallet" ||
+		cfg.LibDir != "/opt/oracle/instantclient" ||
+		cfg.SSLCertPath != "" || cfg.SSLKeyPath != "" {
+		t.Errorf("Oracle config = (driver:%q, TLS:%q, wallet:%q, libDir:%q, cert:%q, key:%q), want TCPS wallet and Instant Client settings",
+			cfg.Driver, cfg.TLS, cfg.SSLCAPath, cfg.LibDir, cfg.SSLCertPath, cfg.SSLKeyPath)
 	}
 }
 
-func TestDatabaseConfigMapsSQLServerTrustServerCertificate(t *testing.T) {
+func TestDatabaseConfigRequiresWalletForTCPS(t *testing.T) {
 	isolateConfigurationEnvironment(t)
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
+	t.Setenv("GOREST_DB_NAME", "FREEPDB1")
 	t.Setenv("GOREST_DB_USER", "test-user")
 	t.Setenv("GOREST_DB_PASSWORD", "test-password")
-	t.Setenv("GOREST_DB_TLS", "strict")
-	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "true")
+	t.Setenv("GOREST_DB_TLS", "enable")
 
-	cfg, err := DatabaseConfig()
-	if err != nil {
-		t.Fatalf("DatabaseConfig() with SQL Server certificate trust setting error = %v", err)
-	}
-	if cfg.TLS != "strict" || !cfg.TrustServerCertificate {
-		t.Fatalf("SQL Server TLS fields = (TLS:%q, trustServerCertificate:%t), want configured values",
-			cfg.TLS, cfg.TrustServerCertificate)
+	if _, err := DatabaseConfig(); err == nil {
+		t.Fatal("DatabaseConfig() accepted Oracle TCPS without a wallet directory")
 	}
 }

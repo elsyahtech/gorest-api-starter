@@ -2,81 +2,84 @@
 
 package integration_test
 
-import "testing"
+import (
+	"testing"
 
-func configureSQLServerTestEnvironment(t *testing.T) {
+	"github.com/elsyahtech/gorest/database"
+)
+
+func configureOracleTestEnvironment(t *testing.T) {
 	t.Helper()
 	t.Setenv("GOREST_APP_ENV", "testing")
 	t.Setenv("GOREST_DB_DISABLE", "false")
-	t.Setenv("GOREST_DB_DRIVER", "sqlserver")
-	t.Setenv("GOREST_DB_HOST", "sqlserver.example.test")
+	t.Setenv("GOREST_DB_DRIVER", database.ORACLE)
+	t.Setenv("GOREST_DB_HOST", "oracle.example.test")
 	t.Setenv("GOREST_DB_PORT", "")
-	t.Setenv("GOREST_DB_NAME", "gorest-dedicated-db")
-	t.Setenv("GOREST_DB_USER", "integration-user")
+	t.Setenv("GOREST_DB_NAME", "FREEPDB1")
+	t.Setenv("GOREST_DB_USER", "gorest_test")
 	t.Setenv("GOREST_DB_PASSWORD", "integration-password")
-	t.Setenv("GOREST_DB_TLS", "mandatory")
+	t.Setenv("GOREST_DB_TLS", database.TLSDisabled)
 	t.Setenv("GOREST_DB_CA_PATH", "")
-	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "false")
-	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "gorest-dedicated-db")
+	t.Setenv("GOREST_DB_LIB_DIR_PATH", "")
+	t.Setenv("GOREST_TEST_ORACLE_CONFIRM_USER", "gorest_test")
 }
 
-func TestLoadSQLServerTestConfigAcceptsVerifiedTLS(t *testing.T) {
-	configureSQLServerTestEnvironment(t)
+func TestLoadOracleTestConfigAcceptsDedicatedSchema(t *testing.T) {
+	configureOracleTestEnvironment(t)
 
-	config, err := loadSQLServerTestConfig()
+	config, err := loadOracleTestConfig()
 	if err != nil {
-		t.Fatalf("loadSQLServerTestConfig() with verified TLS error = %v", err)
+		t.Fatalf("loadOracleTestConfig() error = %v", err)
 	}
-	if config.tls != "mandatory" || config.database != "gorest-dedicated-db" ||
-		config.port != "1433" {
-		t.Fatalf("SQL Server test configuration = (TLS:%q, database-set:%t, port:%q), want mandatory TLS, confirmed database, and default port",
-			config.tls, config.database != "", config.port)
+	if config.tls != database.TLSDisabled || config.serviceName != "FREEPDB1" ||
+		config.username != "gorest_test" || config.port != database.ORACLE_PORT {
+		t.Fatalf("Oracle test configuration = (TLS:%q, service:%q, schema:%q, port:%q), want configured service, confirmed schema, and default port",
+			config.tls, config.serviceName, config.username, config.port)
 	}
-
 	environment := config.appEnvironment("3000", t.TempDir(), "test-signature-key")
-	if environment["GOREST_DB_DRIVER"] != "sqlserver" ||
-		environment["GOREST_DB_TLS"] != "mandatory" ||
-		environment["GOREST_DB_CA_PATH"] != "" ||
-		environment["GOREST_DB_TRUST_SERVER_CERTIFICATE"] != "false" ||
+	if environment["GOREST_DB_DRIVER"] != database.ORACLE ||
+		environment["GOREST_DB_NAME"] != "FREEPDB1" ||
+		environment["GOREST_DB_USER"] != "gorest_test" ||
+		environment["GOREST_DB_TLS"] != database.TLSDisabled ||
 		environment["GOREST_DB_MIGRATION"] != "true" ||
 		environment["GOREST_DB_SEEDER"] != "true" {
-		t.Fatal("application environment does not enforce verified SQL Server TLS and enable migration/seeder")
+		t.Fatal("application environment does not select Oracle and enable migrations/seeders")
 	}
 }
 
-func TestLoadSQLServerTestConfigRequiresExactDatabaseConfirmation(t *testing.T) {
-	configureSQLServerTestEnvironment(t)
-	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "another-database")
+func TestLoadOracleTestConfigRequiresExactSchemaConfirmation(t *testing.T) {
+	configureOracleTestEnvironment(t)
+	t.Setenv("GOREST_TEST_ORACLE_CONFIRM_USER", "another-user")
 
-	if _, err := loadSQLServerTestConfig(); err == nil {
-		t.Fatal("loadSQLServerTestConfig() accepted a database without exact-name confirmation")
+	if _, err := loadOracleTestConfig(); err == nil {
+		t.Fatal("loadOracleTestConfig() accepted a schema without exact username confirmation")
 	}
 }
 
-func TestLoadSQLServerTestConfigRejectsSystemDatabase(t *testing.T) {
-	configureSQLServerTestEnvironment(t)
-	t.Setenv("GOREST_DB_NAME", "master")
-	t.Setenv("GOREST_TEST_SQLSERVER_CONFIRM_DATABASE", "master")
+func TestLoadOracleTestConfigRejectsAdministrativeAccounts(t *testing.T) {
+	configureOracleTestEnvironment(t)
+	t.Setenv("GOREST_DB_USER", "SYS")
+	t.Setenv("GOREST_TEST_ORACLE_CONFIRM_USER", "SYS")
 
-	if _, err := loadSQLServerTestConfig(); err == nil {
-		t.Fatal("loadSQLServerTestConfig() accepted a SQL Server system database")
+	if _, err := loadOracleTestConfig(); err == nil {
+		t.Fatal("loadOracleTestConfig() accepted the Oracle SYS account")
 	}
 }
 
-func TestLoadSQLServerTestConfigRejectsUnverifiedServerCertificate(t *testing.T) {
-	configureSQLServerTestEnvironment(t)
-	t.Setenv("GOREST_DB_TRUST_SERVER_CERTIFICATE", "true")
+func TestLoadOracleTestConfigRejectsProduction(t *testing.T) {
+	configureOracleTestEnvironment(t)
+	t.Setenv("GOREST_APP_ENV", "production")
 
-	if _, err := loadSQLServerTestConfig(); err == nil {
-		t.Fatal("loadSQLServerTestConfig() accepted TrustServerCertificate=true")
+	if _, err := loadOracleTestConfig(); err == nil {
+		t.Fatal("loadOracleTestConfig() accepted production mode")
 	}
 }
 
-func TestLoadSQLServerTestConfigRequiresEncryptedTLS(t *testing.T) {
-	configureSQLServerTestEnvironment(t)
-	t.Setenv("GOREST_DB_TLS", "disable")
+func TestLoadOracleTestConfigRequiresWalletForTCPS(t *testing.T) {
+	configureOracleTestEnvironment(t)
+	t.Setenv("GOREST_DB_TLS", database.TLSEnabled)
 
-	if _, err := loadSQLServerTestConfig(); err == nil {
-		t.Fatal("loadSQLServerTestConfig() accepted disabled SQL Server TLS")
+	if _, err := loadOracleTestConfig(); err == nil {
+		t.Fatal("loadOracleTestConfig() accepted TCPS without a wallet directory")
 	}
 }

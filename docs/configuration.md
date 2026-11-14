@@ -8,9 +8,11 @@ The sample uses GOREST v1.1.21. Application settings use `GOREST_APP_*`; the HTT
 
 Server listener options include TCP/Unix network, TLS certificate files, TLS minimum version, shutdown timeout, Unix socket mode, and prefork settings. Blank listener values use the defaults provided by the GOREST version selected in `go.mod`. See `.env.example` and the [GOREST v1.1.21 configuration guide](https://github.com/elsyahtech/gorest/blob/v1.1.21/docs/configuration.md).
 
-## SQL Server
+## Oracle
 
-SQL Server connection variables are documented in the [SQL Server configuration guide](./database.md). The starter defaults to `GOREST_DB_TLS=mandatory` and `GOREST_DB_TRUST_SERVER_CERTIFICATE=false`, which encrypts connections and validates the server certificate. The certificate chain must be trusted by the host operating system or supplied through `GOREST_DB_CA_PATH`, and the configured host must match its subject alternative names. Do not enable `GOREST_DB_TRUST_SERVER_CERTIFICATE` in production.
+Oracle connection variables are documented in the [Oracle configuration guide](./database.md). The starter uses `GOREST_DB_NAME` as the Oracle service name and requires an application schema username and password. Install Oracle Instant Client and set `GOREST_DB_LIB_DIR_PATH` when it is outside the system library path.
+
+For encrypted Oracle Net connections, set `GOREST_DB_TLS=enable` and configure `GOREST_DB_CA_PATH` to an Oracle wallet directory (`TNS_ADMIN`). This path is not a PEM CA file; generic client certificate and key settings are not used by the Oracle adapter. Keep certificate verification enabled in Oracle Net configuration. `GOREST_DB_TLS=disable` uses plaintext TCP and is suitable only for trusted local or isolated networks; enable TCPS and validate the wallet configuration for remote production connections.
 
 ## Redis (optional)
 

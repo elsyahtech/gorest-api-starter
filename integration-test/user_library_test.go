@@ -21,16 +21,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
-	testConfig, err := loadSQLServerTestConfig()
+func TestOracleUserLibraryAgainstDatabase(t *testing.T) {
+	testConfig, err := loadOracleTestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	applySQLServerTestConfig(t, testConfig)
+	applyOracleTestConfig(t, testConfig)
 
 	dbConfig, err := config.DatabaseConfig()
 	if err != nil {
-		t.Fatalf("load SQL Server library-test configuration: %v", err)
+		t.Fatalf("load Oracle library-test configuration: %v", err)
 	}
 	dbConfig.Migration = true
 	dbConfig.Seeder = false
@@ -40,9 +40,12 @@ func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
 	app.Use(log.Run(log.ConfigDefault), database.Run(*dbConfig))
 	t.Cleanup(func() {
 		if _, _, err := app.Close(); err != nil {
-			t.Errorf("close SQL Server library-test application: %v", err)
+			t.Errorf("close Oracle library-test application: %v", err)
 		}
 	})
+	if err := app.RunDatabaseStartupTasks(); err != nil {
+		t.Fatalf("run Oracle library-test migration: %v", err)
+	}
 
 	preflightConfig := *dbConfig
 	preflightConfig.Migration = false
@@ -51,11 +54,11 @@ func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
 	testDB, message, err := database.New(ctx, &preflightConfig, gorest.DefaultTimezone)
 	cancel()
 	if err != nil {
-		t.Fatalf("connect to SQL Server library-test database (%s): %v", message, err)
+		t.Fatalf("connect to Oracle library-test database (%s): %v", message, err)
 	}
 	t.Cleanup(func() {
 		if err := testDB.SQL.Close(); err != nil {
-			t.Errorf("close SQL Server library-test connection: %v", err)
+			t.Errorf("close Oracle library-test connection: %v", err)
 		}
 	})
 
@@ -76,11 +79,11 @@ func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	message, status, err := userLibrary.CreateUser(user)
 	if err != nil || status != http.StatusOK || message == "" {
-		t.Fatalf("CreateUser() = (%q, %d, %v), want successful SQL Server persistence", message, status, err)
+		t.Fatalf("CreateUser() = (%q, %d, %v), want successful Oracle persistence", message, status, err)
 	}
 
 	var storedPassword string
-	if err := testDB.SQL.QueryRow("SELECT password FROM dbo.users WHERE id = @p1", userID).Scan(&storedPassword); err != nil {
+	if err := testDB.SQL.QueryRow("SELECT password FROM users WHERE id = :1", userID).Scan(&storedPassword); err != nil {
 		t.Fatalf("read password persisted by UserLibrary: %v", err)
 	}
 	if storedPassword == plainPassword || storedPassword == "" {
@@ -88,12 +91,12 @@ func TestSQLServerUserLibraryAgainstDatabase(t *testing.T) {
 	}
 	passwordMatches, _, _, err := helper.VerifyArgon(plainPassword, storedPassword)
 	if err != nil || !passwordMatches {
-		t.Fatalf("verify SQL Server password hash: matches=%t, err=%v", passwordMatches, err)
+		t.Fatalf("verify Oracle password hash: matches=%t, err=%v", passwordMatches, err)
 	}
 
 	users, message, status, err := userLibrary.GetUsers()
 	if err != nil || status != http.StatusOK || message == "" || users == nil {
-		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want SQL Server users", users == nil, message, status, err)
+		t.Fatalf("GetUsers() = (nil:%t, %q, %d, %v), want Oracle users", users == nil, message, status, err)
 	}
 	found := false
 	for _, listedUser := range *users {
@@ -119,7 +122,7 @@ func cleanupUserByID(t *testing.T, db interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }, id string) {
 	t.Helper()
-	if _, err := db.Exec("DELETE FROM dbo.users WHERE id = @p1", id); err != nil {
-		t.Errorf("clean up SQL Server library-test user %s: %v", id, err)
+	if _, err := db.Exec("DELETE FROM users WHERE id = :1", id); err != nil {
+		t.Errorf("clean up Oracle library-test user %s: %v", id, err)
 	}
 }

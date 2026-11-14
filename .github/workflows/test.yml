@@ -29,6 +29,9 @@ jobs:
       - name: Run unit tests
         run: go test ./... -count=1
 
+      - name: Run isolated Oracle integration-configuration tests
+        run: go test -tags=integration -run '^TestLoadOracleTestConfig' -count=1 ./integration-test
+
       - name: Generate unit coverage reports
         run: make coverage
 
@@ -48,92 +51,5 @@ jobs:
             coverage/unit.coverprofile
             coverage/unit-coverage.txt
             coverage/unit-coverage.html
-          if-no-files-found: warn
-          retention-days: 30
-
-  integration-config:
-    name: Check SQL Server test configuration
-    runs-on: ubuntu-24.04
-    outputs:
-      configured: ${{ steps.check.outputs.configured }}
-    steps:
-      - name: Check required SQL Server test secrets
-        id: check
-        shell: bash
-        env:
-          SQLSERVER_HOST: ${{ secrets.GOREST_TEST_SQLSERVER_HOST }}
-          SQLSERVER_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_DATABASE }}
-          SQLSERVER_USER: ${{ secrets.GOREST_TEST_SQLSERVER_USER }}
-          SQLSERVER_PASSWORD: ${{ secrets.GOREST_TEST_SQLSERVER_PASSWORD }}
-          SQLSERVER_TLS: ${{ secrets.GOREST_TEST_SQLSERVER_TLS }}
-          SQLSERVER_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_CONFIRM_DATABASE }}
-        run: |
-          configured=true
-          if [[ -z "$SQLSERVER_HOST" || -z "$SQLSERVER_DATABASE" || -z "$SQLSERVER_USER" ||
-                -z "$SQLSERVER_PASSWORD" ]]; then
-            configured=false
-          elif [[ "$SQLSERVER_TLS" != "mandatory" && "$SQLSERVER_TLS" != "strict" ]]; then
-            configured=false
-          elif [[ "$SQLSERVER_CONFIRM_DATABASE" != "$SQLSERVER_DATABASE" ]]; then
-            configured=false
-          elif [[ "${SQLSERVER_DATABASE,,}" == "master" || "${SQLSERVER_DATABASE,,}" == "model" ||
-                  "${SQLSERVER_DATABASE,,}" == "msdb" || "${SQLSERVER_DATABASE,,}" == "tempdb" ]]; then
-            configured=false
-          fi
-
-          echo "configured=$configured" >> "$GITHUB_OUTPUT"
-          if [[ "$configured" == "false" ]]; then
-            echo "SQL Server integration tests skipped: configure all required GOREST_TEST_SQLSERVER_* secrets for a dedicated non-production database."
-          fi
-
-  integration:
-    name: SQL Server integration tests
-    runs-on: ubuntu-24.04
-    needs: integration-config
-    if: needs.integration-config.outputs.configured == 'true'
-    env:
-      GOREST_APP_ENV: testing
-      GOREST_DB_DISABLE: "false"
-      GOREST_DB_DRIVER: sqlserver
-      GOREST_DB_HOST: ${{ secrets.GOREST_TEST_SQLSERVER_HOST }}
-      GOREST_DB_PORT: ${{ secrets.GOREST_TEST_SQLSERVER_PORT }}
-      GOREST_DB_NAME: ${{ secrets.GOREST_TEST_SQLSERVER_DATABASE }}
-      GOREST_DB_USER: ${{ secrets.GOREST_TEST_SQLSERVER_USER }}
-      GOREST_DB_PASSWORD: ${{ secrets.GOREST_TEST_SQLSERVER_PASSWORD }}
-      GOREST_DB_TLS: ${{ secrets.GOREST_TEST_SQLSERVER_TLS }}
-      GOREST_DB_TRUST_SERVER_CERTIFICATE: "false"
-      GOREST_TEST_SQLSERVER_CONFIRM_DATABASE: ${{ secrets.GOREST_TEST_SQLSERVER_CONFIRM_DATABASE }}
-    steps:
-      - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Set up Go from go.mod
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Run SQL Server integration tests and reports
-        run: make integration-reports
-
-      - name: Upload integration coverage to Codecov
-        if: success()
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage/integration.coverprofile
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload integration test reports
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: sqlserver-integration-report-${{ github.sha }}
-          path: |
-            coverage/integration-test.txt
-            coverage/integration-test.json
-            coverage/integration.coverprofile
-            coverage/integration-coverage.txt
-            coverage/integration-coverage.html
           if-no-files-found: warn
           retention-days: 30

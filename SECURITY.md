@@ -30,14 +30,15 @@ Maintainers will acknowledge and investigate reports on a best-effort basis. The
 
 This repository is a learning and implementation starter, not a production-secured service. In particular:
 
-- Most `/examples` routes are unauthenticated. `POST /examples/login` issues an access cookie, and only `GET /examples/orm-queries/users/with-authentication` requires it. This demonstration does not provide authorization or protect the other routes; do not expose them to untrusted clients without adding appropriate access controls.
-- The checked-in application configuration defaults to SQLite and contains no production database credentials. The optional driver-test Compose file uses disposable local-only test credentials; do not reuse them. Runtime connection settings are read from `GOREST_DB_*` and optional Redis settings from `GOREST_REDIS_*`; the application does not load `.env` files. Inject production secrets through a protected environment or secret manager. If a real secret has ever been committed or used in a deployment, rotate it.
-- `Migration=true` / `Seeder=true` are local-example defaults only. With `APP_ENV=production`, both default to false and startup rejects either being enabled. Apply schema changes through a controlled deployment step; do not run sample seeders against production data.
-- Database TLS is driver-specific. GOREST emits an informational production warning for configurations where transport encryption is disabled or not guaranteed, but the warning does not block startup or configure TLS. Review the [per-driver TLS guidance](./docs/database.md#production-transport-encryption-by-driver) and apply the policy appropriate to your database and network.
+- The active example exposes `POST /users/create` and `POST /users/login` without authentication; `GET /users/` requires a valid access cookie. This is demonstration authentication, not a complete authorization system. Add application-specific access controls before exposing user data to untrusted clients.
+- This starter is configured for Oracle. `.env.example` contains placeholders, not production credentials, and `.env` is ignored by Git. The application loads `.env` when present; for production, inject secrets through a protected environment or secret manager. If a real secret has ever been committed or used in a deployment, rotate it.
+- Oracle migrations and sample seeders are disabled by default in `.env.example`. Enabling `GOREST_DB_MIGRATION` or `GOREST_DB_SEEDER` writes to the configured Oracle schema; use a controlled deployment step and never run sample seeders against production data.
+- Oracle TLS uses TCPS and an Oracle wallet. The example defaults to unencrypted TCP for local testing only. Configure and verify the wallet for remote production connections; see the [Oracle configuration guide](./docs/database.md).
+- Redis is optional and disabled by default in `.env.example`. If enabled, configure its connection and transport security separately; the user endpoints do not depend on Redis.
 - CORS, security headers, request limits, and the in-memory rate limiter are not substitutes for authentication, authorization, TLS, or deployment-level controls. The in-memory limiter applies per process.
-- Native SQL examples are driver-specific; ORM and transaction behavior differs between database drivers. Passing the test suite does not establish that every driver or production topology is secure.
+- Passing the test suite does not establish that every Oracle deployment topology is secure.
 
-See [Configuration, security, and deployment](./docs/configuration.md) for deployment guidance and [Testing and E2E coverage](./docs/testing.md) for the test scope and driver limitations.
+See [Configuration, security, and deployment](./docs/configuration.md) and the [testing guide](./docs/testing.md) for more detail.
 
 If a report concerns a vulnerability in GOREST or another dependency rather than this starter's integration, please also report it to the relevant upstream project through its private reporting channel.
 

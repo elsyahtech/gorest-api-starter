@@ -1,0 +1,8 @@
+BEGIN
+    EXECUTE IMMEDIATE 'DROP INDEX ix_users_is_active';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1418 THEN
+            RAISE;
+        END IF;
+END;
